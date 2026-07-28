@@ -1,0 +1,111 @@
+import { useState, FormEvent, useRef, useEffect } from 'react';
+import { useChat } from '../context/ChatContext';
+import { chatApi } from '../api';
+import { Send, Paperclip, Smile, Mic } from 'lucide-react';
+
+export default function MessageComposer() {
+  const [input, setInput] = useState('');
+  const { currentConversation, addMessage, selectedChannel, setConversations, setCurrentConversation, setIsThinking } = useChat();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [input]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const text = input;
+    setInput('');
+    
+    const convId = currentConversation ? currentConversation.id : "0";
+
+    // Optimistic UI update
+    const tempId = Date.now().toString();
+    addMessage({
+      id: tempId,
+      conversation_id: convId,
+      sender: 'user',
+      message: text,
+      created_at: new Date().toISOString(),
+    });
+
+    try {
+      setIsThinking(true);
+      // Actually send to backend API
+      const reply = await chatApi.sendMessage(convId, text);
+      addMessage(reply);
+
+      // If we started a new conversation, fetch updated conversations and select it
+      if (!currentConversation) {
+         const updatedConvs = await chatApi.getConversations(selectedChannel);
+         setConversations(updatedConvs);
+         const newConv = updatedConvs.find(c => String(c.id) === String(reply.conversation_id));
+         if (newConv) setCurrentConversation(newConv);
+      }
+    } catch (error: any) {
+      console.error('Failed to send message:', error);
+      // Show error in UI
+      addMessage({
+        id: Date.now().toString() + "_error",
+        conversation_id: convId,
+        sender: 'bot',
+        message: `⚠️ Error: Could not connect to the backend server. Details: ${error.message || String(error)}. Make sure the backend is running.`,
+        created_at: new Date().toISOString(),
+      });
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="relative group">
+      <div className="glass rounded-3xl p-2 flex items-end border border-gray-200 dark:border-gray-700 shadow-xl shadow-purple-500/5 focus-within:ring-2 focus-within:ring-purple-500/50 transition-all">
+        
+        <button type="button" className="p-3 text-gray-400 hover:text-purple-500 transition-colors rounded-xl">
+          <Paperclip size={20} />
+        </button>
+
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Message Maya..."
+          className="flex-1 max-h-[200px] bg-transparent border-none outline-none resize-none py-3 px-2 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+          rows={1}
+        />
+
+        <div className="flex items-center p-2 space-x-1">
+          <button type="button" className="p-2 text-gray-400 hover:text-purple-500 transition-colors rounded-xl hidden sm:block">
+            <Smile size={20} />
+          </button>
+          {input.trim() === '' ? (
+            <button type="button" className="p-2 text-gray-400 hover:text-purple-500 transition-colors rounded-xl">
+              <Mic size={20} />
+            </button>
+          ) : (
+            <button 
+              type="submit" 
+              className="p-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl shadow-md shadow-purple-500/20 hover:shadow-purple-500/40 transition-all active:scale-95"
+            >
+              <Send size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+    </form>
+  );
+}

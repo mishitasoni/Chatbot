@@ -1,0 +1,72 @@
+import { createContext, useContext, useState, ReactNode, useCallback, useRef, useEffect } from 'react';
+import { ChannelType, Conversation, Message } from '../types';
+
+interface ChatContextType {
+  selectedChannel: ChannelType;
+  setSelectedChannel: (channel: ChannelType) => void;
+  conversations: Conversation[];
+  setConversations: (conversations: Conversation[]) => void;
+  currentConversation: Conversation | null;
+  setCurrentConversation: (conversation: Conversation | null) => void;
+  messages: Message[];
+  setMessages: (messages: Message[]) => void;
+  addMessage: (message: Message) => void;
+  isThinking: boolean;
+  setIsThinking: (val: boolean) => void;
+}
+
+const ChatContext = createContext<ChatContextType | undefined>(undefined);
+
+export function ChatProvider({ children }: { children: ReactNode }) {
+  const [selectedChannel, setSelectedChannel] = useState<ChannelType>('general');
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isThinking, setIsThinking] = useState(false);
+
+  const currentConvRef = useRef(currentConversation);
+  
+  useEffect(() => {
+    currentConvRef.current = currentConversation;
+  }, [currentConversation]);
+
+  const addMessage = useCallback((message: Message) => {
+    setMessages((prev) => {
+      // Only append if this message belongs to the currently active conversation
+      if (currentConvRef.current && currentConvRef.current.id === message.conversation_id) {
+        // Prevent duplicate messages if any
+        if (prev.find(m => m.id === message.id)) return prev;
+        return [...prev, message];
+      }
+      return prev;
+    });
+  }, []);
+
+  return (
+    <ChatContext.Provider
+      value={{
+        selectedChannel,
+        setSelectedChannel,
+        conversations,
+        setConversations,
+        currentConversation,
+        setCurrentConversation,
+        messages,
+        setMessages,
+        addMessage,
+        isThinking,
+        setIsThinking,
+      }}
+    >
+      {children}
+    </ChatContext.Provider>
+  );
+}
+
+export const useChat = () => {
+  const context = useContext(ChatContext);
+  if (context === undefined) {
+    throw new Error('useChat must be used within a ChatProvider');
+  }
+  return context;
+};
