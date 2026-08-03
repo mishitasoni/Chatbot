@@ -12,8 +12,13 @@ export function useWebSocket() {
     if (!user) return;
 
     // Use relative path for Vite proxy or absolute if running directly
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/chat/${user.id}`;
+    let wsUrl = '';
+    if (import.meta.env.VITE_WS_URL) {
+      wsUrl = `${import.meta.env.VITE_WS_URL}/ws/chat/${user.id}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/ws/chat/${user.id}`;
+    }
     
     ws.current = new WebSocket(wsUrl);
 
