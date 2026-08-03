@@ -1,4 +1,4 @@
-export type ChannelType = 'general' | 'telegram' | 'whatsapp';
+export type ChannelType = string;
 
 export interface Message {
   id: string;
