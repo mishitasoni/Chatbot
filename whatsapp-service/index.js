@@ -18,12 +18,14 @@ function getBrowserPath() {
     const paths = [
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+        '/usr/bin/chromium',
+        '/usr/bin/google-chrome'
     ];
     for (let p of paths) {
         if (fs.existsSync(p)) return p;
     }
-    return null;
+    return process.env.PUPPETEER_EXECUTABLE_PATH || null;
 }
 
 const activeSessions = new Map();
