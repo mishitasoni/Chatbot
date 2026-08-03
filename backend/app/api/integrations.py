@@ -3,12 +3,15 @@ from sqlalchemy.orm import Session
 from app.database.dependencies import get_db
 from app.models.user import User
 from pydantic import BaseModel
-
+from app.models.user_channel import UserChannel
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
 class TelegramTokenRequest(BaseModel):
     user_id: int
     token: str
+
+class ChannelActionRequest(BaseModel):
+    user_id: int
 
 @router.post("/telegram")
 def link_telegram(request: TelegramTokenRequest, db: Session = Depends(get_db)):
@@ -27,6 +30,25 @@ def link_telegram(request: TelegramTokenRequest, db: Session = Depends(get_db)):
     user.telegram_bot_token = request.token
     db.commit()
     
+    # Pre-create a new conversation for this bot token if it doesn't exist
+    from app.models.conversation import Conversation
+    try:
+        bot_info = bot.get_me()
+        bot_name = bot_info.first_name
+    except:
+        bot_name = request.token[:10] if request.token else "default"
+    platform_key = f"telegram_{bot_name}"
+    
+    existing_conv = db.query(Conversation).filter(
+        Conversation.user_id == user.id,
+        Conversation.platform == platform_key
+    ).first()
+    
+    if not existing_conv:
+        new_conv = Conversation(user_id=user.id, platform=platform_key)
+        db.add(new_conv)
+        db.commit()
+
     # Restart telegram manager for this user
     from app.services.telegram_client import restart_user_bot
     restart_user_bot(user.id, request.token)
@@ -50,64 +72,72 @@ def get_whatsapp_qr(user_id: int, db: Session = Depends(get_db)):
         return {"qr": qr_code}
     return {"message": "QR code not ready yet, try again"}, 202
 
-@router.get("/test_token")
-def test_token():
-    import subprocess
-    try:
-        process = subprocess.Popen(["python", "e:\\Chatbot\\query_db.py"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, shell=True)
-        out, err = process.communicate(timeout=5)
-        with open("e:\\Chatbot\\db_out.txt", "r") as f:
-            return {"output": f.read()}
-    except Exception as e:
-        return {"error": str(e)}
-
-@router.get("/debug_openclaw")
-def debug_openclaw():
-    import subprocess
-    import threading
-    import time
+@router.get("/channels/status/{user_id}")
+def get_channel_status(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    channels = db.query(UserChannel).filter(UserChannel.user_id == user_id).all()
     
-    def run_cmd():
-        try:
-            # We must use shell=True on Windows if openclaw is a .cmd file
-            process = subprocess.Popen(
-                "openclaw channels login --channel whatsapp > e:\\Chatbot\\test_qr_out.txt 2>&1",
-                shell=True
-            )
-            time.sleep(10) # wait 10 seconds to collect output
-            process.kill()
-        except Exception as e:
-            with open("e:\\Chatbot\\test_qr_out.txt", "w") as f:
-                f.write(str(e))
-            
-    t = threading.Thread(target=run_cmd)
-    t.start()
-    t.join(timeout=15)
+    has_whatsapp = any(c.channel_type == 'whatsapp' for c in channels)
+    has_telegram = any(c.channel_type == 'telegram' for c in channels)
     
-    try:
-        with open("e:\\Chatbot\\test_qr_out.txt", "r") as f:
-            return {"output": f.read()}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-
-@router.get("/debug_db")
-def debug_openclaw_db():
-    import sqlite3
-    import os
-    home = os.path.expanduser("~")
-    db_path = os.path.join(home, ".openclaw", "state", "openclaw.sqlite")
-    if not os.path.exists(db_path):
-        return {"error": "no db"}
-    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    tables = con.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    res = [
+        {
+            "channel_type": c.channel_type,
+            "status": c.status,
+            "phone_number": c.phone_number
+        }
+        for c in channels
+    ]
     
-    res = {"tables": [t[0] for t in tables]}
-    
-    # Try to grab 5 rows from channel_pairing_requests if it exists
-    if "channel_pairing_requests" in res["tables"]:
-        rows = con.execute("SELECT * FROM channel_pairing_requests ORDER BY rowid DESC LIMIT 5").fetchall()
-        res["channel_pairing_requests"] = rows
+    if not has_whatsapp:
+        res.append({
+            "channel_type": "whatsapp",
+            "status": "disconnected",
+            "phone_number": None
+        })
         
+    if not has_telegram:
+        # Check if they have a bot token in the user record
+        if user and user.telegram_bot_token:
+            res.append({
+                "channel_type": "telegram",
+                "status": "connected",
+                "phone_number": None
+            })
+        else:
+            res.append({
+                "channel_type": "telegram",
+                "status": "disconnected",
+                "phone_number": None
+            })
+            
     return res
+
+@router.post("/channels/whatsapp/disconnect")
+def disconnect_whatsapp(request: ChannelActionRequest, db: Session = Depends(get_db)):
+    channel = db.query(UserChannel).filter(
+        UserChannel.user_id == request.user_id,
+        UserChannel.channel_type == "whatsapp"
+    ).first()
+    
+    if channel:
+        channel.status = "disconnected"
+        channel.phone_number = None
+        db.commit()
+        
+    import subprocess
+    try:
+        subprocess.run(["openclaw.cmd", "channels", "remove", "--channel", "whatsapp", "--account", f"user_{request.user_id}"])
+    except:
+        pass
+        
+    return {"status": "success", "message": "Disconnected"}
+
+@router.post("/channels/telegram/disconnect")
+def disconnect_telegram(request: ChannelActionRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == request.user_id).first()
+    if user:
+        user.telegram_bot_token = None
+        db.commit()
+        
+    return {"status": "success", "message": "Telegram disconnected"}

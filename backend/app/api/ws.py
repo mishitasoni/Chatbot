@@ -22,8 +22,19 @@ class ConnectionManager:
 
     async def broadcast_to_user(self, user_id: str, message: dict):
         if user_id in self.active_connections:
+            dead_connections = []
             for connection in self.active_connections[user_id]:
-                await connection.send_json(message)
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    dead_connections.append(connection)
+            
+            for connection in dead_connections:
+                self.disconnect(connection, user_id)
+
+    async def broadcast_to_all(self, message: dict):
+        for uid in list(self.active_connections.keys()):
+            await self.broadcast_to_user(uid, message)
 
 manager = ConnectionManager()
 

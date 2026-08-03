@@ -3,7 +3,6 @@ import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import { MessageSquare, Hash, Clock, Activity, AlertCircle, Save, QrCode } from 'lucide-react';
 import axios from 'axios';
-import { QRCodeSVG } from 'qrcode.react';
 
 export default function RightPanel() {
   const { selectedChannel, currentConversation } = useChat();
@@ -25,6 +24,7 @@ export default function RightPanel() {
         token: telegramToken
       });
       setTelegramSaved(true);
+      window.dispatchEvent(new CustomEvent('chat:refresh_conversations'));
       setTimeout(() => setTelegramSaved(false), 3000);
     } catch (error) {
       console.error("Failed to save telegram token", error);
@@ -40,12 +40,25 @@ export default function RightPanel() {
     try {
       // Polling for QR code
       const checkQR = async () => {
-        const response = await axios.get(`http://localhost:8000/api/integrations/whatsapp/qr/${user.id}`);
-        if (response.data.qr && response.data.qr !== 'LOADING...') {
-          setWhatsappQR(response.data.qr);
-          setLoadingQR(false);
-        } else {
-          setTimeout(checkQR, 2000); // Poll every 2s
+        try {
+          const response = await axios.get(`http://localhost:8000/api/integrations/whatsapp/qr/${user.id}`);
+          
+          if (response.data.qr === 'CONNECTED' || response.data.status === 'connected') {
+            setWhatsappQR('CONNECTED');
+            setLoadingQR(false);
+            return; // Stop polling
+          }
+          
+          if (response.data.qr && response.data.qr !== 'LOADING...') {
+            setWhatsappQR(response.data.qr);
+            setLoadingQR(false);
+          }
+          
+          // Keep polling every 3 seconds to catch QR rotations or connection success
+          setTimeout(checkQR, 3000);
+        } catch (e) {
+          console.error(e);
+          setTimeout(checkQR, 3000);
         }
       };
       checkQR();
@@ -78,7 +91,7 @@ export default function RightPanel() {
             <h3 className="font-medium">Connection Status</h3>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500 dark:text-gray-400">OpenClaw Gateway</span>
+            <span className="text-gray-500 dark:text-gray-400">ChatFusion Gateway</span>
             <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full font-medium">Connected</span>
           </div>
         </div>
@@ -125,46 +138,38 @@ export default function RightPanel() {
           {selectedChannel === 'whatsapp' && (
             <div className="space-y-4">
               <div className="flex flex-col space-y-3">
-                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium text-center">Scan to Link WhatsApp</label>
-              </div>
-              <div className="mt-6 flex flex-col items-center">
-                {whatsappQR ? (
-                  <div className="flex justify-center bg-white p-4 rounded-xl">
-                    {whatsappQR.includes('▄') || whatsappQR.includes('█') ? (
-                      <pre style={{ 
-                        fontFamily: 'monospace', 
-                        lineHeight: '1', 
-                        fontSize: '10px', 
-                        background: 'white', 
-                        color: 'black', 
-                        margin: 0, 
-                        padding: '10px' 
-                      }}>
-                        {whatsappQR}
-                      </pre>
-                    ) : (
-                      <QRCodeSVG value={whatsappQR} size={200} />
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex justify-center">
-                    <button 
-                      onClick={handleLinkWhatsapp}
-                      disabled={loadingQR}
-                      className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
-                    >
-                      <QrCode size={16} />
-                      <span>{loadingQR ? 'Generating QR Code...' : 'Generate Linking QR'}</span>
-                    </button>
+                <label className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium text-center">WhatsApp Integration</label>
+                {!whatsappQR && !loadingQR && (
+                  <button 
+                    onClick={handleLinkWhatsapp}
+                    className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+                  >
+                    <QrCode size={16} />
+                    <span>Connect WhatsApp</span>
+                  </button>
+                )}
+                
+                {loadingQR && !whatsappQR && (
+                  <div className="text-center text-sm text-gray-500 p-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+                    <p>Generating QR Code...</p>
                   </div>
                 )}
-                {whatsappQR && (
-                  <p className="text-xs text-center text-gray-500 mt-2">Scan this QR code from your WhatsApp Linked Devices screen.</p>
+                
+                {whatsappQR && whatsappQR !== 'CONNECTED' && (
+                  <div className="flex flex-col items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                    <img src={whatsappQR} alt="WhatsApp QR Code" className="w-[200px] h-[200px]" />
+                    <p className="text-xs text-gray-500 mt-3 text-center">
+                      Open WhatsApp on your phone, go to Linked Devices, and scan this code.
+                    </p>
+                  </div>
                 )}
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <DetailRow icon={<AlertCircle size={16} />} label="QR Status" value={whatsappQR ? "Waiting for scan" : "Not Generated"} />
+                
+                {whatsappQR === 'CONNECTED' && (
+                  <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-xl font-medium border border-green-200 dark:border-green-800/50">
+                    ✅ WhatsApp is Connected!
+                  </div>
+                )}
               </div>
             </div>
           )}

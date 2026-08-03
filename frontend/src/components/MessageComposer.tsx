@@ -1,12 +1,14 @@
 import { useState, FormEvent, useRef, useEffect } from 'react';
 import { useChat } from '../context/ChatContext';
 import { chatApi } from '../api';
-import { Send, Paperclip, Smile, Mic } from 'lucide-react';
+import { Send, Paperclip, Smile, Mic, X } from 'lucide-react';
 
 export default function MessageComposer() {
   const [input, setInput] = useState('');
   const { currentConversation, addMessage, selectedChannel, setConversations, setCurrentConversation, setIsThinking } = useChat();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -18,10 +20,15 @@ export default function MessageComposer() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() && !selectedImage) return;
 
-    const text = input;
+    let text = input;
+    if (selectedImage) {
+      text = `![image](${selectedImage})\n\n${text}`;
+    }
+    
     setInput('');
+    setSelectedImage(null);
     
     const convId = currentConversation ? currentConversation.id : "0";
 
@@ -73,8 +80,41 @@ export default function MessageComposer() {
   return (
     <form onSubmit={handleSubmit} className="relative group">
       <div className="glass rounded-3xl p-2 flex items-end border border-gray-200 dark:border-gray-700 shadow-xl shadow-purple-500/5 focus-within:ring-2 focus-within:ring-purple-500/50 transition-all">
-        
-        <button type="button" className="p-3 text-gray-400 hover:text-purple-500 transition-colors rounded-xl">
+        {selectedImage && (
+          <div className="absolute -top-20 left-2 p-1 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+            <div className="relative">
+              <img src={selectedImage} alt="Upload preview" className="h-16 w-auto rounded-md object-cover" />
+              <button 
+                type="button" 
+                onClick={() => setSelectedImage(null)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 shadow-sm"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          hidden 
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = () => setSelectedImage(reader.result as string);
+              reader.readAsDataURL(file);
+            }
+            if (e.target) e.target.value = '';
+          }}
+        />
+        <button 
+          type="button" 
+          onClick={() => fileInputRef.current?.click()}
+          className="p-3 text-gray-400 hover:text-purple-500 transition-colors rounded-xl"
+        >
           <Paperclip size={20} />
         </button>
 
@@ -92,7 +132,7 @@ export default function MessageComposer() {
           <button type="button" className="p-2 text-gray-400 hover:text-purple-500 transition-colors rounded-xl hidden sm:block">
             <Smile size={20} />
           </button>
-          {input.trim() === '' ? (
+          {input.trim() === '' && !selectedImage ? (
             <button type="button" className="p-2 text-gray-400 hover:text-purple-500 transition-colors rounded-xl">
               <Mic size={20} />
             </button>

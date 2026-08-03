@@ -1,8 +1,24 @@
 import { Message } from '../types';
 import { motion } from 'framer-motion';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
+import 'katex/dist/katex.min.css';
 
 export default function ChatBubble({ message }: { message: Message }) {
   const isUser = message.sender === 'user';
+
+  const processMath = (text: string) => {
+    if (!text) return '';
+    return text
+      .replace(/\\\[/g, '$$$$') // '$$$$' in replace string outputs '$$'
+      .replace(/\\\]/g, '$$$$')
+      .replace(/\\\(/g, '$')
+      .replace(/\\\)/g, '$');
+  };
+
+  const processedMessage = processMath(message.message);
 
   return (
     <motion.div 
@@ -17,8 +33,21 @@ export default function ChatBubble({ message }: { message: Message }) {
           : 'glass text-gray-800 dark:text-gray-100 rounded-bl-sm border border-gray-200 dark:border-gray-700'
         }
       `}>
-        <div className="whitespace-pre-wrap prose dark:prose-invert max-w-none text-sm md:text-base leading-relaxed break-words">
-          {message.message}
+        <div className="prose dark:prose-invert max-w-none text-sm md:text-base leading-relaxed break-words">
+          <ReactMarkdown
+            remarkPlugins={[remarkMath, remarkGfm]}
+            rehypePlugins={[rehypeKatex]}
+            urlTransform={(value: string) => {
+              if (value.startsWith('data:image/')) return value;
+              return defaultUrlTransform(value);
+            }}
+            components={{
+              p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+              img: ({node, src, alt, ...props}) => <img src={src} alt={alt} className="max-w-full rounded-lg my-2" {...props} />
+            }}
+          >
+            {processedMessage}
+          </ReactMarkdown>
         </div>
         <div className={`text-[10px] mt-2 font-medium ${isUser ? 'text-purple-200' : 'text-gray-400'}`}>
           {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

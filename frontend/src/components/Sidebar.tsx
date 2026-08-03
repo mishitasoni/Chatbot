@@ -28,7 +28,7 @@ export default function Sidebar({ onClose }: { onClose: () => void }) {
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center space-x-2 font-bold text-xl text-purple-600 dark:text-purple-400">
           <BotIcon className="w-8 h-8" />
-          <span>OpenClaw</span>
+          <span>ChatFusion</span>
         </div>
         <button onClick={onClose} className="md:hidden p-2 text-gray-500">
           <X size={20} />
@@ -84,7 +84,7 @@ export default function Sidebar({ onClose }: { onClose: () => void }) {
             <Plus size={14} />
           </button>
         </div>
-        {conversations.filter(c => c.platform === selectedChannel).map(conv => (
+        {conversations.filter(c => c.platform.startsWith(selectedChannel)).map(conv => (
           <button
             key={conv.id}
             onClick={() => setCurrentConversation(conv)}
@@ -94,7 +94,9 @@ export default function Sidebar({ onClose }: { onClose: () => void }) {
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
             }`}
           >
-            Conversation #{conv.id}
+            {selectedChannel === 'telegram' && conv.platform.startsWith('telegram_') && conv.platform !== 'telegram_default' 
+              ? conv.platform.substring(9) 
+              : `Conversation #${conv.id}`}
           </button>
         ))}
       </div>
@@ -105,7 +107,7 @@ export default function Sidebar({ onClose }: { onClose: () => void }) {
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
-        <button className="w-full flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm text-gray-700 dark:text-gray-300">
+        <button onClick={() => navigate('/settings/channels')} className="w-full flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm text-gray-700 dark:text-gray-300">
           <Settings size={18} />
           <span>Settings</span>
         </button>

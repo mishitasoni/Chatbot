@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -12,22 +12,23 @@ from app.services.chatbot import ask_llm
 
 router = APIRouter()
 
-# Mock user for testing (since auth is mostly mocked right now)
-MOCK_USER_ID = 1
-
 @router.get("/conversations", response_model=List[ConversationResponse])
-def get_conversations(platform: str, db: Session = Depends(get_db)):
-    conversations = db.query(Conversation).filter(
-        Conversation.user_id == MOCK_USER_ID,
-        Conversation.platform == platform
-    ).order_by(Conversation.id.desc()).all()
+def get_conversations(platform: str, x_user_id: int = Header(...), db: Session = Depends(get_db)):
+    if platform in ["whatsapp", "telegram"]:
+        conversations = db.query(Conversation).filter(
+            Conversation.platform.like(f"{platform}%")
+        ).order_by(Conversation.id.desc()).all()
+    else:
+        conversations = db.query(Conversation).filter(
+            Conversation.user_id == x_user_id,
+            Conversation.platform.like(f"{platform}%")
+        ).order_by(Conversation.id.desc()).all()
     return conversations
 
 @router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
-def get_messages(conversation_id: int, db: Session = Depends(get_db)):
+def get_messages(conversation_id: int, x_user_id: int = Header(...), db: Session = Depends(get_db)):
     conversation = db.query(Conversation).filter(
-        Conversation.id == conversation_id,
-        Conversation.user_id == MOCK_USER_ID
+        Conversation.id == conversation_id
     ).first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -35,16 +36,16 @@ def get_messages(conversation_id: int, db: Session = Depends(get_db)):
     return conversation.messages
 
 @router.post("/chat", response_model=MessageResponse)
-async def send_chat_message(msg_in: MessageCreate, db: Session = Depends(get_db)):
+async def send_chat_message(msg_in: MessageCreate, x_user_id: int = Header(...), db: Session = Depends(get_db)):
     # Verify conversation
     conversation = db.query(Conversation).filter(
         Conversation.id == msg_in.conversation_id,
-        Conversation.user_id == MOCK_USER_ID
+        Conversation.user_id == x_user_id
     ).first()
     
     if not conversation:
         # Create one if it doesn't exist
-        conversation = Conversation(user_id=MOCK_USER_ID, platform="general")
+        conversation = Conversation(user_id=x_user_id, platform="general")
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
@@ -86,7 +87,7 @@ async def send_chat_message(msg_in: MessageCreate, db: Session = Depends(get_db)
 
     # Broadcast to all connected clients for this user
     await manager.broadcast_to_user(
-        str(MOCK_USER_ID), 
+        str(x_user_id), 
         {
             "id": bot_msg.id,
             "conversation_id": bot_msg.conversation_id,

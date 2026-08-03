@@ -1,6 +1,5 @@
 import threading
 import telebot
-import os
 import asyncio
 from app.services.chatbot import ask_llm
 from app.models.conversation import Conversation
@@ -44,22 +43,44 @@ def restart_user_bot(user_id: int, token: str):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    @bot.message_handler(func=lambda message: True)
+    # Encode bot name in platform string to separate conversations by token
+    try:
+        bot_info = bot.get_me()
+        bot_name = bot_info.first_name
+    except Exception as e:
+        print(f"[Telegram Client] Could not fetch bot info: {e}")
+        bot_name = token[:10] if token else "default"
+        
+    platform_key = f"telegram_{bot_name}"
+
+    @bot.message_handler(content_types=['text', 'photo'])
     def handle_messages(message):
-        question = message.text
-        print(f"\n[Telegram User {user_id}] You: {question}")
+        question = message.text or message.caption or ""
+        
+        if message.photo:
+            try:
+                file_id = message.photo[-1].file_id
+                file_info = bot.get_file(file_id)
+                downloaded_file = bot.download_file(file_info.file_path)
+                import base64
+                base64_img = base64.b64encode(downloaded_file).decode('utf-8')
+                # Append text to image so UI and LLM can both process it
+                question = f"![image](data:image/jpeg;base64,{base64_img})\n\n{question}"
+            except Exception as e:
+                print(f"[Telegram User {user_id}] Error downloading photo: {e}")
+                
+        print(f"\n[Telegram User {user_id}] You: {question[:100]}...")
         
         # 1. Save User Message to DB
         db = SessionLocal()
         try:
-            platform = "telegram"
             conversation = db.query(Conversation).filter(
                 Conversation.user_id == user_id,
-                Conversation.platform == platform
+                Conversation.platform == platform_key
             ).first()
             
             if not conversation:
-                conversation = Conversation(user_id=user_id, platform=platform)
+                conversation = Conversation(user_id=user_id, platform=platform_key)
                 db.add(conversation)
                 db.commit()
                 db.refresh(conversation)
@@ -93,8 +114,7 @@ def restart_user_bot(user_id: int, token: str):
             # 2. Get LLM Answer
             raw_answer = ask_llm(question)
             
-            from app.utils.format import clean_markdown
-            answer = clean_markdown(raw_answer)
+            answer = raw_answer 
             
             print(f"\n[Telegram User {user_id}] Bot: {answer}")
             
@@ -145,6 +165,5 @@ def restart_user_bot(user_id: int, token: str):
     print(f"========================================")
     
     # Run polling in a background thread so it doesn't block the caller
-    import threading
     thread = threading.Thread(target=bot.infinity_polling, daemon=True)
     thread.start()

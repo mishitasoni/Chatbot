@@ -76,7 +76,7 @@ export default function DashboardPage() {
         >
           <Menu size={24} />
         </button>
-        <div className="font-semibold ml-2">OpenClaw Chatbot</div>
+        <div className="font-semibold ml-2">ChatFusion Chatbot</div>
       </div>
 
       {/* Left Sidebar */}

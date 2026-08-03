@@ -5,6 +5,7 @@ import { ChatProvider } from './context/ChatContext';
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import ConnectedChannelsPage from './pages/ConnectedChannelsPage';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
             <Routes>
               <Route path="/" element={<LoginPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/settings/channels" element={<ConnectedChannelsPage />} />
             </Routes>
           </Router>
         </ChatProvider>

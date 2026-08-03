@@ -5,11 +5,21 @@ const api = axios.create({
   baseURL: '/api',
 });
 
+api.interceptors.request.use((config) => {
+  const userId = localStorage.getItem('user_id');
+  if (userId) {
+    config.headers['X-User-Id'] = userId;
+  }
+  return config;
+});
+
 export const authApi = {
   login: async (emailOrPhone: string) => {
-    // In real app, POST /api/auth/login
-    // For now we mock it since we are missing this backend endpoint in the prompt
-    return { success: true, user: { id: '1', emailOrPhone } };
+    // Determine if it's an email or phone heuristically
+    const isEmail = emailOrPhone.includes('@');
+    const payload = isEmail ? { email: emailOrPhone } : { phone: emailOrPhone };
+    const response = await api.post('/auth/login', payload);
+    return { success: true, user: response.data };
   },
 };
 

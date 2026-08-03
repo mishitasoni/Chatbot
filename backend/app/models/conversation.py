@@ -21,5 +21,6 @@ class Conversation(Base):
     messages = relationship(
         "Message",
         back_populates="conversation",
-        cascade="all, delete"
+        cascade="all, delete",
+        order_by="Message.id"
     )

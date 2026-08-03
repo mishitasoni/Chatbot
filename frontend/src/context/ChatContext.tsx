@@ -1,18 +1,18 @@
-import { createContext, useContext, useState, ReactNode, useCallback, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useRef, useEffect } from 'react';
 import { ChannelType, Conversation, Message } from '../types';
 
 interface ChatContextType {
   selectedChannel: ChannelType;
   setSelectedChannel: (channel: ChannelType) => void;
   conversations: Conversation[];
-  setConversations: (conversations: Conversation[]) => void;
+  setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
   currentConversation: Conversation | null;
-  setCurrentConversation: (conversation: Conversation | null) => void;
+  setCurrentConversation: React.Dispatch<React.SetStateAction<Conversation | null>>;
   messages: Message[];
-  setMessages: (messages: Message[]) => void;
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   addMessage: (message: Message) => void;
   isThinking: boolean;
-  setIsThinking: (val: boolean) => void;
+  setIsThinking: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
