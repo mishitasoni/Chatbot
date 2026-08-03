@@ -4,7 +4,7 @@ from app.database.dependencies import get_db
 from app.models.user import User
 from pydantic import BaseModel
 from app.models.user_channel import UserChannel
-router = APIRouter(prefix="/api/integrations", tags=["integrations"])
+router = APIRouter(prefix="/integrations", tags=["integrations"])
 
 class TelegramTokenRequest(BaseModel):
     user_id: int

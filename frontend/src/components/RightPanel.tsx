@@ -26,9 +26,10 @@ export default function RightPanel() {
       setTelegramSaved(true);
       window.dispatchEvent(new CustomEvent('chat:refresh_conversations'));
       setTimeout(() => setTelegramSaved(false), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save telegram token", error);
-      alert("Failed to link Telegram. Make sure the backend is running.");
+      const backendMessage = error.response?.data?.detail || error.message || "Network Error";
+      alert("Failed to link Telegram: " + backendMessage);
     } finally {
       setSavingTelegram(false);
     }
