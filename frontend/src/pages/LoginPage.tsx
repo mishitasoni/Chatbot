@@ -13,11 +13,14 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate network delay
-    setTimeout(async () => {
+    try {
       await login(input);
       navigate('/dashboard');
-    }, 800);
+    } catch (error: any) {
+      alert("Login failed: " + (error.message || "Network Error"));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isEmail = input.includes('@');
