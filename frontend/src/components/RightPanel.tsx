@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
 import { MessageSquare, Hash, Clock, Activity, AlertCircle, Save, QrCode } from 'lucide-react';
-import axios from 'axios';
+import { api } from '../api';
 
 export default function RightPanel() {
   const { selectedChannel, currentConversation } = useChat();
@@ -19,7 +19,7 @@ export default function RightPanel() {
     if (!telegramToken || !user) return;
     setSavingTelegram(true);
     try {
-      await axios.post('http://localhost:8000/api/integrations/telegram', {
+      await api.post('/integrations/telegram', {
         user_id: parseInt(user.id),
         token: telegramToken
       });
@@ -41,7 +41,7 @@ export default function RightPanel() {
       // Polling for QR code
       const checkQR = async () => {
         try {
-          const response = await axios.get(`http://localhost:8000/api/integrations/whatsapp/qr/${user.id}`);
+          const response = await api.get(`/integrations/whatsapp/qr/${user.id}`);
           
           if (response.data.qr === 'CONNECTED' || response.data.status === 'connected') {
             setWhatsappQR('CONNECTED');
