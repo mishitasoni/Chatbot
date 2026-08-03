@@ -1,0 +1,9 @@
+nodejs
+npm
+chromium
+libxss1
+fonts-ipafont-gothic
+fonts-wqy-zenhei
+fonts-thai-tlwg
+fonts-kacst
+fonts-freefont-ttf
