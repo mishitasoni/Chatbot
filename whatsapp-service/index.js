@@ -44,9 +44,13 @@ async function initWhatsAppSession(userId) {
             '--no-sandbox', 
             '--disable-setuid-sandbox', 
             '--disable-dev-shm-usage', 
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
             '--disable-gpu',
             '--disable-software-rasterizer',
-            '--disable-extensions'
+            '--disable-extensions',
+            '--disable-site-isolation-trials'
         ],
         timeout: 120000 // 120 seconds for slow Render servers
     };
@@ -185,6 +189,7 @@ async function initWhatsAppSession(userId) {
 
     client.initialize().catch(err => {
         console.error(`[WhatsApp Init Error]:`, err);
+        activeSessions.delete(userIdStr);
     });
 
     return sessionObj;
