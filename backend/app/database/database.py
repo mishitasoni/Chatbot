@@ -8,8 +8,8 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# If no URL is provided (like on Render by default), fallback to SQLite so the app doesn't crash
-if not DATABASE_URL:
+# If no URL is provided, or if it points to localhost (which won't work on Render), fallback to SQLite
+if not DATABASE_URL or "localhost" in DATABASE_URL:
     DATABASE_URL = "sqlite:///./chatbot.db"
 
 # SQLite requires specific connect_args to avoid thread issues

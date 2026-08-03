@@ -1,8 +1,11 @@
 import axios from 'axios';
 import { Conversation, Message } from '../types';
 
+const rawApiUrl = import.meta.env.VITE_API_URL;
+const apiUrl = rawApiUrl ? rawApiUrl.replace(/\/+$/, '') : '/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: apiUrl,
 });
 
 api.interceptors.request.use((config) => {
