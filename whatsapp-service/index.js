@@ -11,7 +11,8 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = 3001;
-const FASTAPI_WEBHOOK_URL = 'http://127.0.0.1:8000/whatsapp/webhook/node';
+const FASTAPI_PORT = process.env.PORT || 10000;
+const FASTAPI_WEBHOOK_URL = `http://127.0.0.1:${FASTAPI_PORT}/whatsapp/webhook/node`;
 const SESSIONS_DIR = path.join(__dirname, '.wwebjs_auth');
 
 function getBrowserPath() {
