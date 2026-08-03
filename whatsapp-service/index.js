@@ -40,7 +40,15 @@ async function initWhatsAppSession(userId) {
     console.log(`[WhatsApp Service] Initializing session for User ${userIdStr}...`);
 
     const puppeteerOptions = {
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-dev-shm-usage', 
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions'
+        ],
+        timeout: 120000 // 120 seconds for slow Render servers
     };
     const browserPath = getBrowserPath();
     if (browserPath) puppeteerOptions.executablePath = browserPath;
@@ -48,6 +56,8 @@ async function initWhatsAppSession(userId) {
     const client = new Client({
         authStrategy: new LocalAuth({ clientId: `user_${userIdStr}` }),
         puppeteer: puppeteerOptions,
+        authTimeoutMs: 120000,
+        qrMaxRetries: 5,
         webVersionCache: { type: 'local' }
     });
 
