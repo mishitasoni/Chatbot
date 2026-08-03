@@ -86,6 +86,20 @@ app.include_router(telegram_router)
 app.include_router(whatsapp_router)
 app.include_router(integrations_router)
 
-@app.get("/")
-def home():
-    return {"message": "Backend Running"}
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+frontend_dist = os.path.join(os.path.dirname(__file__), "../../frontend/dist")
+if os.path.exists(frontend_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+else:
+    @app.get("/")
+    def home():
+        return {"message": "Backend Running, but frontend dist not found"}

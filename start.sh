@@ -13,5 +13,5 @@ cd /app/backend
 echo "Initializing database tables..."
 python -m app.database.create_tables
 
-# Render automatically injects the PORT environment variable. We default to 10000 if not set.
-uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}
+# HF Spaces automatically injects the PORT environment variable as 7860. We default to 7860 if not set.
+uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}

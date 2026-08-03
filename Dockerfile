@@ -17,6 +17,9 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm install
+
 COPY whatsapp-service/package*.json ./whatsapp-service/
 RUN cd whatsapp-service && npm install
 
@@ -25,7 +28,9 @@ RUN cd backend && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 10000
+RUN cd frontend && npm run build
+
+EXPOSE 7860
 
 RUN chmod +x /app/start.sh
 CMD ["/app/start.sh"]
