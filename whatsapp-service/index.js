@@ -63,7 +63,7 @@ async function initWhatsAppSession(userId) {
         puppeteer: puppeteerOptions,
         authTimeoutMs: 120000,
         qrMaxRetries: 5,
-        webVersionCache: { type: 'local' }
+        webVersionCache: { type: 'none' }
     });
 
     const sessionObj = {
