@@ -18,7 +18,14 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const [selectedChannel, setSelectedChannel] = useState<ChannelType>('general');
+  const [selectedChannel, setSelectedChannel] = useState<ChannelType>(() => {
+    const saved = localStorage.getItem('selectedChannel');
+    return (saved as ChannelType) || 'general';
+  });
+  
+  useEffect(() => {
+    localStorage.setItem('selectedChannel', selectedChannel);
+  }, [selectedChannel]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);

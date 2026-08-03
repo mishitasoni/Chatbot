@@ -8,8 +8,12 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# If no URL is provided, or if it points to localhost (which won't work on Render), fallback to SQLite
-if not DATABASE_URL or "localhost" in DATABASE_URL:
+# SQLAlchemy 1.4+ requires postgresql:// instead of postgres://
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# If no URL is provided, fallback to SQLite as a last resort
+if not DATABASE_URL:
     DATABASE_URL = "sqlite:///./chatbot.db"
 
 # SQLite requires specific connect_args to avoid thread issues
