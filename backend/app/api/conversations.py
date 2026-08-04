@@ -45,7 +45,13 @@ async def send_chat_message(msg_in: MessageCreate, x_user_id: int = Header(...),
     
     if not conversation:
         # Create one if it doesn't exist
-        conversation = Conversation(user_id=x_user_id, platform="general")
+        platform_name = msg_in.platform
+        
+        # If they are on telegram, they should only be talking to their personal bot, so we need the exact token name.
+        # But for general and whatsapp, we can just use the provided string.
+        # However, to be safe, if they send 'telegram', we can just use 'telegram_default' or let them use it.
+        # It's better to just use what the frontend sends.
+        conversation = Conversation(user_id=x_user_id, platform=platform_name)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)

@@ -32,8 +32,11 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
     from app.database.database import SessionLocal
     db = SessionLocal()
     try:
-        user = get_or_create_user_by_phone(db, phone_number)
-        user_id = user.id
+        if bot_user_id is not None:
+            user_id = bot_user_id
+        else:
+            user = get_or_create_user_by_phone(db, phone_number)
+            user_id = user.id
 
         # 1. Find or create conversation
         conversation = db.query(Conversation).filter(

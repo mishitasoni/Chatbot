@@ -40,7 +40,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const addMessage = useCallback((message: Message) => {
     setMessages((prev) => {
       // Only append if this message belongs to the currently active conversation
-      if (currentConvRef.current && currentConvRef.current.id === message.conversation_id) {
+      // Or if it's an optimistic update for a new conversation (id 0 or "0")
+      if (
+        (currentConvRef.current && String(currentConvRef.current.id) === String(message.conversation_id)) ||
+        String(message.conversation_id) === "0"
+      ) {
         // Prevent duplicate messages if any
         if (prev.find(m => m.id === message.id)) return prev;
         return [...prev, message];

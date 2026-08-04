@@ -37,10 +37,11 @@ export const chatApi = {
     return response.data;
   },
 
-  sendMessage: async (conversationId: string, message: string): Promise<Message> => {
+  sendMessage: async (conversationId: string, message: string, platform: string = "general"): Promise<Message> => {
     const response = await api.post(`/chat`, {
       conversation_id: conversationId,
       message,
+      platform,
     });
     return response.data;
   },

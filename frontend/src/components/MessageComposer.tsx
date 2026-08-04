@@ -45,7 +45,7 @@ export default function MessageComposer() {
     try {
       setIsThinking(true);
       // Actually send to backend API
-      const reply = await chatApi.sendMessage(convId, text);
+      const reply = await chatApi.sendMessage(convId, text, selectedChannel);
       addMessage(reply);
 
       // If we started a new conversation, fetch updated conversations and select it

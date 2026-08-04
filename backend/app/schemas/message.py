@@ -7,6 +7,7 @@ class MessageBase(BaseModel):
 class MessageCreate(MessageBase):
     conversation_id: int
     sender: str = "user"
+    platform: str = "general"
 
 class MessageResponse(MessageBase):
     id: int

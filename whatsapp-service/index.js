@@ -62,8 +62,7 @@ async function initWhatsAppSession(userId) {
         authStrategy: new LocalAuth({ clientId: `user_${userIdStr}` }),
         puppeteer: puppeteerOptions,
         authTimeoutMs: 120000,
-        qrMaxRetries: 5,
-        webVersionCache: { type: 'none' }
+        qrMaxRetries: 5
     });
 
     const sessionObj = {
