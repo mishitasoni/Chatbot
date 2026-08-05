@@ -10,6 +10,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+    res.send('WhatsApp Microservice is running successfully!');
+});
+
 const PORT = 3001;
 const FASTAPI_PORT = process.env.PORT || 10000;
 const FASTAPI_WEBHOOK_URL = `http://127.0.0.1:${FASTAPI_PORT}/whatsapp/webhook/node`;
@@ -51,8 +55,10 @@ async function initWhatsAppSession(userId) {
             '--disable-gpu',
             '--disable-software-rasterizer',
             '--disable-extensions',
-            '--disable-site-isolation-trials'
+            '--disable-site-isolation-trials',
+            '--disable-blink-features=AutomationControlled'
         ],
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
         timeout: 120000 // 120 seconds for slow Render servers
     };
     const browserPath = getBrowserPath();
@@ -108,10 +114,16 @@ async function initWhatsAppSession(userId) {
         }
     });
 
-    client.on('ready', () => {
+    client.on('ready', async () => {
         sessionObj.connected = true;
         sessionObj.qrBase64 = null;
         console.log(`[WhatsApp Service] User ${userIdStr} connected successfully!`);
+        try {
+            await client.sendPresenceAvailable();
+            console.log(`[WhatsApp Service] User ${userIdStr} presence set to Available`);
+        } catch (e) {
+            console.error(`[WhatsApp Service] Error setting presence for User ${userIdStr}:`, e);
+        }
     });
 
     client.on('disconnected', (reason) => {
