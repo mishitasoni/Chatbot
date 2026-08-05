@@ -117,8 +117,8 @@ async function initWhatsAppSession(userId) {
 
     client.on('authenticated', () => {
         console.log(`[WhatsApp Service] User ${userIdStr} AUTHENTICATED! Waiting for ready...`);
-        // We set qrBase64 to 'CONNECTED' so the frontend stops polling and shows the connected status.
-        // We keep sessionObj.connected = false until the 'ready' event fires to prevent premature message sending.
+        // We set connected to true immediately so the UI works and we can send messages even if ready is slow
+        sessionObj.connected = true;
         sessionObj.qrBase64 = 'CONNECTED';
     });
 
@@ -140,33 +140,38 @@ async function initWhatsAppSession(userId) {
         activeSessions.delete(userIdStr);
     });
 
-    // 4. 'Message Yourself' Architecture & 5. Anti-Infinite-Loop Safeguards
+    // 4. Process Incoming Messages and Message Yourself
     client.on('message_create', async (msg) => {
-        // Only process messages sent BY ME (Message Yourself)
-        if (!msg.fromMe) return;
-        
-        console.log(`[DEBUG] fromMe Message: body="${msg.body}", to="${msg.to}", from="${msg.from}", _serialized="${client.info.wid._serialized}"`);
-
         // Ignore messages sent by the bot itself to prevent infinite loops
         if (sessionObj.botSentMessageIds.has(msg.id.id)) return;
         if (sessionObj.recentBotResponses.has(msg.body)) return;
+        if (msg.isStatus) return; // Ignore status updates
 
-        // Ensure the message is actually sent in our "Message Yourself" chat
-        // WhatsApp sometimes routes self-chats using your internal @lid instead of your phone number.
-        // To safely distinguish YOUR @lid from a FRIEND'S @lid, we verify the contact's isMe flag.
+        // Allow: 
+        // 1. Incoming messages from others (!msg.fromMe)
+        // 2. Messages sent to yourself (Message Yourself)
+        let isMessageYourself = false;
         try {
-            const myNumber = client.info.wid.user + '@c.us';
-            if (msg.to !== myNumber && msg.to !== client.info.wid._serialized && msg.to !== msg.from) {
-                // If it doesn't strictly match our phone number, verify if the recipient contact is US
+            const myNumber = client.info && client.info.wid ? client.info.wid.user + '@c.us' : null;
+            if (myNumber && (msg.to === myNumber || msg.to === client.info.wid._serialized || msg.to === msg.from)) {
+                isMessageYourself = true;
+            } else if (msg.to) {
+                // Check if the recipient contact is US
                 const contact = await client.getContactById(msg.to);
-                if (!contact || !contact.isMe) return;
+                if (contact && contact.isMe) {
+                    isMessageYourself = true;
+                }
             }
         } catch (e) {
             console.error('[WhatsApp Service] Error verifying contact:', e);
+        }
+
+        if (msg.fromMe && !isMessageYourself) {
+            // Ignore outgoing messages sent to other people
             return;
         }
 
-        console.log(`[WhatsApp Service] Received message to self: ${msg.body}`);
+        console.log(`[WhatsApp Service] Received message: ${msg.body} from ${msg.from} to ${msg.to}`);
 
         try {
             let base64Media = null;
