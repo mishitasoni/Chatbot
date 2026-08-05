@@ -28,16 +28,8 @@ async def startup_event():
     thread = threading.Thread(target=start_telegram_bot, daemon=True)
     thread.start()
     
-    # Auto-start the WhatsApp Node.js microservice
-    whatsapp_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../whatsapp-service"))
-    if os.path.exists(whatsapp_dir):
-        try:
-            import platform
-            node_cmd = "node.exe" if platform.system() == "Windows" else "node"
-            node_process = subprocess.Popen([node_cmd, "index.js"], cwd=whatsapp_dir, shell=False)
-            print(f"[Node Microservice] Started WhatsApp service with PID {node_process.pid}")
-        except Exception as e:
-            print(f"[Node Microservice] Error starting WhatsApp service: {e}")
+    # The WhatsApp Node.js microservice is managed by start.sh on deployment.
+    # It should be run manually locally or via a script, not inside FastAPI.
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -51,12 +43,7 @@ async def shutdown_event():
         except Exception as e:
             print(f"[Telegram Client] Error stopping bot for User {user_id}: {e}")
             
-    if node_process:
-        print(f"[Node Microservice] Stopping PID {node_process.pid}")
-        try:
-            node_process.terminate()
-        except:
-            pass
+    # Node process is managed externally
 
 app.add_middleware(
     CORSMiddleware,
