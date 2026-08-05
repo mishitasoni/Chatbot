@@ -107,6 +107,7 @@ async function initWhatsAppSession(userId) {
 
     client.on('qr', async (qr) => {
         try {
+            if (sessionObj.connected || sessionObj.qrBase64 === 'CONNECTED') return;
             sessionObj.qrBase64 = await qrcode.toDataURL(qr);
             sessionObj.connected = false;
             console.log(`[WhatsApp Service] Generated QR Code for User ${userIdStr}`);
