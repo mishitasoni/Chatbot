@@ -115,6 +115,13 @@ async function initWhatsAppSession(userId) {
         }
     });
 
+    client.on('authenticated', () => {
+        console.log(`[WhatsApp Service] User ${userIdStr} AUTHENTICATED! Waiting for ready...`);
+        // We set qrBase64 to 'CONNECTED' so the frontend stops polling and shows the connected status.
+        // We keep sessionObj.connected = false until the 'ready' event fires to prevent premature message sending.
+        sessionObj.qrBase64 = 'CONNECTED';
+    });
+
     client.on('ready', async () => {
         sessionObj.connected = true;
         sessionObj.qrBase64 = null;
