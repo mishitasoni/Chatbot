@@ -58,6 +58,17 @@ async function initWhatsAppSession(userId) {
     const browserPath = getBrowserPath();
     if (browserPath) puppeteerOptions.executablePath = browserPath;
 
+    const sessionDir = path.join(SESSIONS_DIR, `session-user_${userIdStr}`);
+    const lockFile = path.join(sessionDir, 'SingletonLock');
+    if (fs.existsSync(lockFile)) {
+        try {
+            fs.unlinkSync(lockFile);
+            console.log(`[WhatsApp Service] Removed stale SingletonLock for user ${userIdStr}`);
+        } catch (e) {
+            console.error(`[WhatsApp Service] Error removing SingletonLock:`, e);
+        }
+    }
+
     const client = new Client({
         authStrategy: new LocalAuth({ clientId: `user_${userIdStr}` }),
         puppeteer: puppeteerOptions,
