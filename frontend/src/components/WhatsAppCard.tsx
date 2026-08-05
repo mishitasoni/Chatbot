@@ -3,6 +3,7 @@ import { FaWhatsapp } from 'react-icons/fa';
 import { RefreshCw, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { QRCodeSVG } from 'qrcode.react';
+import { api } from '../api';
 
 interface ChannelStatus {
   channel_type: string;
@@ -21,9 +22,9 @@ export default function WhatsAppCard() {
   const fetchStatus = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`http://localhost:8005/api/integrations/channels/status/${user.id}`);
-      const data: ChannelStatus[] = await res.json();
-      const wa = data.find(c => c.channel_type === 'whatsapp');
+      const res = await api.get(`/integrations/channels/status/${user.id}`);
+      const data: ChannelStatus[] = res.data;
+      const wa = data.find((c: ChannelStatus) => c.channel_type === 'whatsapp');
       if (wa) {
         setStatus(wa.status);
         setPhone(wa.phone_number);
@@ -42,9 +43,9 @@ export default function WhatsAppCard() {
   const fetchQrCode = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`http://localhost:8005/api/integrations/whatsapp/qr/${user.id}`);
+      const res = await api.get(`/integrations/whatsapp/qr/${user.id}`);
       if (res.status === 200) {
-        const data = await res.json();
+        const data = res.data;
         if (data.qr && data.qr !== 'LOADING...') {
           setQrCode(data.qr);
         }
@@ -67,7 +68,7 @@ export default function WhatsAppCard() {
     setLoading(true);
     try {
       // Trigger QR generation
-      await fetch(`http://localhost:8005/api/integrations/whatsapp/qr/${user.id}`);
+      await api.get(`/integrations/whatsapp/qr/${user.id}`);
       setStatus('connecting');
       fetchQrCode();
     } catch (e) {
@@ -81,11 +82,7 @@ export default function WhatsAppCard() {
     if (!user) return;
     setLoading(true);
     try {
-      await fetch(`http://localhost:8005/api/integrations/channels/whatsapp/disconnect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id })
-      });
+      await api.post(`/integrations/channels/whatsapp/disconnect`, { user_id: user.id });
       setStatus('disconnected');
       setPhone(null);
       setQrCode(null);

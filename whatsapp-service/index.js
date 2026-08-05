@@ -56,7 +56,8 @@ async function initWhatsAppSession(userId) {
             '--disable-software-rasterizer',
             '--disable-extensions',
             '--disable-site-isolation-trials',
-            '--disable-blink-features=AutomationControlled'
+            '--disable-blink-features=AutomationControlled',
+            '--single-process'
         ],
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
         timeout: 120000 // 120 seconds for slow Render servers
@@ -81,7 +82,7 @@ async function initWhatsAppSession(userId) {
         authTimeoutMs: 120000,
         qrMaxRetries: 5,
         webVersionCache: {
-            type: 'none'
+            type: 'local'
         }
     });
 

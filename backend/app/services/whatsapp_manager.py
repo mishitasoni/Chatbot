@@ -8,7 +8,7 @@ def get_qr_for_user(user_id: int) -> Optional[str]:
     Calls the Node.js microservice to get the QR code for a specific user.
     """
     try:
-        response = httpx.get(f"{NODE_SERVICE_URL}/qr/{user_id}", timeout=25.0)
+        response = httpx.get(f"{NODE_SERVICE_URL}/qr/{user_id}", timeout=60.0)
         data = response.json()
         
         if data.get("status") == "connected":
