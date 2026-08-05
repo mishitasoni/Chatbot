@@ -62,7 +62,11 @@ async function initWhatsAppSession(userId) {
         authStrategy: new LocalAuth({ clientId: `user_${userIdStr}` }),
         puppeteer: puppeteerOptions,
         authTimeoutMs: 120000,
-        qrMaxRetries: 5
+        qrMaxRetries: 5,
+        webVersionCache: {
+            type: 'remote',
+            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+        }
     });
 
     const sessionObj = {
@@ -75,6 +79,14 @@ async function initWhatsAppSession(userId) {
     };
 
     activeSessions.set(userIdStr, sessionObj);
+
+    client.on('loading_screen', (percent, message) => {
+        console.log(`[WhatsApp Service] User ${userIdStr} LOADING SCREEN`, percent, message);
+    });
+
+    client.on('auth_failure', (msg) => {
+        console.error(`[WhatsApp Service] User ${userIdStr} AUTH FAILURE`, msg);
+    });
 
     client.on('qr', async (qr) => {
         try {
