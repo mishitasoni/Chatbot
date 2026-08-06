@@ -142,9 +142,28 @@ async function initWhatsAppSession(userId) {
                 // Prevent infinite loop by ignoring messages the bot just sent
                 if (msg.key.id && sessionObj.botSentMessageIds.has(msg.key.id)) continue;
                 
-                let body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || "";
+                let msgContent = msg.message;
+                if (msgContent?.ephemeralMessage?.message) {
+                    msgContent = msgContent.ephemeralMessage.message;
+                } else if (msgContent?.viewOnceMessage?.message) {
+                    msgContent = msgContent.viewOnceMessage.message;
+                } else if (msgContent?.viewOnceMessageV2?.message) {
+                    msgContent = msgContent.viewOnceMessageV2.message;
+                } else if (msgContent?.documentWithCaptionMessage?.message) {
+                    msgContent = msgContent.documentWithCaptionMessage.message;
+                }
                 
-                console.log(`[WhatsApp Service] Processing message from ${remoteJid}: ${body}`);
+                let body = msgContent?.conversation || 
+                           msgContent?.extendedTextMessage?.text || 
+                           msgContent?.imageMessage?.caption || 
+                           msgContent?.videoMessage?.caption || 
+                           "";
+                           
+                if (!body) {
+                    console.log(`[WhatsApp Service] Empty body detected. Message structure:`, JSON.stringify(msg.message));
+                } else {
+                    console.log(`[WhatsApp Service] Processing message from ${remoteJid}: ${body}`);
+                }
                 
                 let base64Media = null;
                 let mimeType = null;
