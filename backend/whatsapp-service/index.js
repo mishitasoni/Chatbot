@@ -125,18 +125,26 @@ async function initWhatsAppSession(userId) {
                 const remoteJid = msg.key.remoteJid;
                 if (!remoteJid) continue;
 
-                // Determine our own Number
-                const myNumber = sock.user.id.split(':')[0];
-                const remoteNumber = remoteJid.split('@')[0];
-                const isMessageYourself = myNumber === remoteNumber;
+                // Determine our own Number safely
+                let isMessageYourself = false;
+                if (sock.user && sock.user.id) {
+                    const myNumber = sock.user.id.split(':')[0];
+                    const remoteNumber = remoteJid.split('@')[0];
+                    isMessageYourself = (myNumber === remoteNumber);
+                    // console.log(`[WhatsApp Service] Message from ${remoteNumber} to ${myNumber}. isYourself: ${isMessageYourself}`);
+                }
 
                 // Only allow messages sent in the "Message yourself" chat (personal chat)
-                if (!isMessageYourself) continue;
+                if (!isMessageYourself) {
+                    continue;
+                }
 
                 // Prevent infinite loop by ignoring messages the bot just sent
                 if (msg.key.id && sessionObj.botSentMessageIds.has(msg.key.id)) continue;
                 
                 let body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || "";
+                
+                console.log(`[WhatsApp Service] Processing message from ${remoteJid}: ${body}`);
                 
                 let base64Media = null;
                 let mimeType = null;
