@@ -17,11 +17,11 @@ export default function Sidebar({ onClose }: { onClose: () => void }) {
     navigate('/');
   };
 
-  const handleDeleteConversation = async (e: React.MouseEvent, id: number) => {
+  const handleDeleteConversation = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (window.confirm("Are you sure you want to delete this chat? This cannot be undone.")) {
       try {
-        await chatApi.deleteConversation(id.toString());
+        await chatApi.deleteConversation(id);
         setConversations(prev => prev.filter(c => c.id !== id));
         if (currentConversation?.id === id) {
           setCurrentConversation(null);
