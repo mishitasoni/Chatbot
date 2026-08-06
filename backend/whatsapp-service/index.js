@@ -120,14 +120,15 @@ async function initWhatsAppSession(userId) {
         });
 
         sock.ev.on('messages.upsert', async (m) => {
-            if (m.type !== 'notify') return;
+            if (m.type !== 'notify' && m.type !== 'append') return;
             for (const msg of m.messages) {
                 const remoteJid = msg.key.remoteJid;
                 if (!remoteJid) continue;
 
-                // Determine our own JID
-                const myJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-                const isMessageYourself = remoteJid === myJid;
+                // Determine our own Number
+                const myNumber = sock.user.id.split(':')[0];
+                const remoteNumber = remoteJid.split('@')[0];
+                const isMessageYourself = myNumber === remoteNumber;
 
                 // Only allow messages sent in the "Message yourself" chat (personal chat)
                 if (!isMessageYourself) continue;
