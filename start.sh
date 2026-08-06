@@ -2,9 +2,7 @@
 
 # Start the WhatsApp Node.js microservice in the background
 echo "Starting WhatsApp Microservice..."
-cd /app/whatsapp-service
-pkill -f chrome || true
-pkill -f chromium || true
+cd /app/backend/whatsapp-service
 node index.js &
 
 # Start the FastAPI backend in the foreground

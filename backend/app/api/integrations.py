@@ -13,6 +13,11 @@ class TelegramTokenRequest(BaseModel):
 class ChannelActionRequest(BaseModel):
     user_id: int
 
+class WhatsAppStatusRequest(BaseModel):
+    user_id: int
+    status: str
+    phone_number: str | None = None
+
 @router.post("/telegram")
 def link_telegram(request: TelegramTokenRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == request.user_id).first()
@@ -64,7 +69,18 @@ def get_whatsapp_qr(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # Ask whatsapp_manager to generate QR code string (will be implemented next)
+    channel = db.query(UserChannel).filter(
+        UserChannel.user_id == user_id,
+        UserChannel.channel_type == "whatsapp"
+    ).first()
+    if not channel:
+        channel = UserChannel(user_id=user_id, channel_type="whatsapp", status="connecting")
+        db.add(channel)
+        db.commit()
+    elif channel.status == "disconnected":
+        channel.status = "connecting"
+        db.commit()
+
     from app.services.whatsapp_manager import get_qr_for_user
     qr_code = get_qr_for_user(user.id)
     
@@ -112,6 +128,28 @@ def get_channel_status(user_id: int, db: Session = Depends(get_db)):
             })
             
     return res
+
+@router.post("/channels/whatsapp/status")
+def sync_whatsapp_status(request: WhatsAppStatusRequest, db: Session = Depends(get_db)):
+    channel = db.query(UserChannel).filter(
+        UserChannel.user_id == request.user_id,
+        UserChannel.channel_type == "whatsapp"
+    ).first()
+    
+    if not channel:
+        channel = UserChannel(
+            user_id=request.user_id,
+            channel_type="whatsapp",
+            status=request.status,
+            phone_number=request.phone_number
+        )
+        db.add(channel)
+    else:
+        channel.status = request.status
+        channel.phone_number = request.phone_number
+        
+    db.commit()
+    return {"status": "success"}
 
 @router.post("/channels/whatsapp/disconnect")
 def disconnect_whatsapp(request: ChannelActionRequest, db: Session = Depends(get_db)):

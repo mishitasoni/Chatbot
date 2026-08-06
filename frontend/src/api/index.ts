@@ -2,7 +2,9 @@ import axios from 'axios';
 import { Conversation, Message } from '../types';
 
 const rawApiUrl = import.meta.env.VITE_API_URL;
-const apiUrl = rawApiUrl !== undefined ? rawApiUrl.replace(/\/+$/, '') : '/api';
+const isDev = import.meta.env.DEV;
+const apiUrl = rawApiUrl !== undefined ? rawApiUrl.replace(/\/+$/, '') : (isDev ? '/api' : '');
+
 
 export const api = axios.create({
   baseURL: apiUrl,

@@ -77,16 +77,20 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 frontend_dist = os.path.join(os.path.dirname(__file__), "../../frontend/dist")
-if os.path.exists(frontend_dist):
-    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+assets_dir = os.path.join(frontend_dist, "assets")
+index_file = os.path.join(frontend_dist, "index.html")
+
+if os.path.exists(frontend_dist) and os.path.exists(index_file):
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
     
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         file_path = os.path.join(frontend_dist, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
-        return FileResponse(os.path.join(frontend_dist, "index.html"))
+        return FileResponse(index_file)
 else:
     @app.get("/")
     def home():
-        return {"message": "Backend Running, but frontend dist not found"}
+        return {"message": "Backend Running, but frontend dist or index.html not found"}

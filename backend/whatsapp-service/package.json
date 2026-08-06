@@ -11,11 +11,11 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
     "axios": "^1.19.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "puppeteer": "^25.4.0",
-    "qrcode": "^1.5.4",
-    "whatsapp-web.js": "github:pedroslopez/whatsapp-web.js#main"
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4"
   }
 }
