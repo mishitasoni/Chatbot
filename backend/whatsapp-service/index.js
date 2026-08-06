@@ -122,10 +122,18 @@ async function initWhatsAppSession(userId) {
         sock.ev.on('messages.upsert', async (m) => {
             if (m.type !== 'notify') return;
             for (const msg of m.messages) {
-                if (msg.key.fromMe) return;
-
                 const remoteJid = msg.key.remoteJid;
                 if (!remoteJid) continue;
+
+                // Determine our own JID
+                const myJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+                const isMessageYourself = remoteJid === myJid;
+
+                // Ignore if it's from us, UNLESS we are messaging ourselves
+                if (msg.key.fromMe && !isMessageYourself) continue;
+
+                // Ignore statuses and group messages
+                if (remoteJid === 'status@broadcast' || remoteJid.endsWith('@g.us')) continue;
                 
                 let body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || "";
                 
