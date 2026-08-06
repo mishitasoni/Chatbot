@@ -129,11 +129,11 @@ async function initWhatsAppSession(userId) {
                 const myJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
                 const isMessageYourself = remoteJid === myJid;
 
-                // Ignore if it's from us, UNLESS we are messaging ourselves
-                if (msg.key.fromMe && !isMessageYourself) continue;
+                // Only allow messages sent in the "Message yourself" chat (personal chat)
+                if (!isMessageYourself) continue;
 
-                // Ignore statuses and group messages
-                if (remoteJid === 'status@broadcast' || remoteJid.endsWith('@g.us')) continue;
+                // Prevent infinite loop by ignoring messages the bot just sent
+                if (msg.key.id && sessionObj.botSentMessageIds.has(msg.key.id)) continue;
                 
                 let body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || "";
                 

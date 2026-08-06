@@ -1,12 +1,13 @@
-import { MessageSquare, Settings, LogOut, Search, Plus, X, Moon, Sun, Send } from 'lucide-react';
+import { MessageSquare, Settings, LogOut, Search, Plus, X, Moon, Sun, Send, Trash2 } from 'lucide-react';
 import { FaTelegramPlane, FaWhatsapp } from 'react-icons/fa';
 import { useChat } from '../context/ChatContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { chatApi } from '../api';
 
 export default function Sidebar({ onClose }: { onClose: () => void }) {
-  const { selectedChannel, setSelectedChannel, conversations, currentConversation, setCurrentConversation } = useChat();
+  const { selectedChannel, setSelectedChannel, conversations, setConversations, currentConversation, setCurrentConversation } = useChat();
   const { theme, toggleTheme } = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -14,6 +15,22 @@ export default function Sidebar({ onClose }: { onClose: () => void }) {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleDeleteConversation = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this chat? This cannot be undone.")) {
+      try {
+        await chatApi.deleteConversation(id.toString());
+        setConversations(prev => prev.filter(c => c.id !== id));
+        if (currentConversation?.id === id) {
+          setCurrentConversation(null);
+        }
+      } catch (error) {
+        console.error("Failed to delete conversation", error);
+        alert("Failed to delete conversation. Please try again.");
+      }
+    }
   };
 
   const channels = [
@@ -85,19 +102,27 @@ export default function Sidebar({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         {conversations.filter(c => c.platform.startsWith(selectedChannel)).map(conv => (
-          <button
-            key={conv.id}
-            onClick={() => setCurrentConversation(conv)}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${
-              currentConversation?.id === conv.id
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-medium'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-            }`}
-          >
-            {selectedChannel === 'telegram' && conv.platform.startsWith('telegram_') && conv.platform !== 'telegram_default' 
-              ? conv.platform.substring(9) 
-              : `Conversation #${conv.id}`}
-          </button>
+          <div key={conv.id} className="relative group w-full flex items-center">
+            <button
+              onClick={() => setCurrentConversation(conv)}
+              className={`w-full text-left px-3 py-2 pr-10 rounded-lg text-sm truncate transition-colors ${
+                currentConversation?.id === conv.id
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-medium'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+              }`}
+            >
+              {selectedChannel === 'telegram' && conv.platform.startsWith('telegram_') && conv.platform !== 'telegram_default' 
+                ? conv.platform.substring(9) 
+                : `Conversation #${conv.id}`}
+            </button>
+            <button
+              onClick={(e) => handleDeleteConversation(e, conv.id)}
+              className="absolute right-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
+              title="Delete Chat"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         ))}
       </div>
 

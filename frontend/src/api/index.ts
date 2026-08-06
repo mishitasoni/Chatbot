@@ -47,4 +47,9 @@ export const chatApi = {
     });
     return response.data;
   },
+
+  deleteConversation: async (conversationId: string): Promise<{ status: string, message: string }> => {
+    const response = await api.delete(`/conversations/${conversationId}`);
+    return response.data;
+  },
 };
