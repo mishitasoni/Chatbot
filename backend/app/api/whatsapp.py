@@ -22,8 +22,9 @@ META_VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN", "doubtnut_webhook_secret")
 ALLOWED_WHATSAPP_NUMBER = os.getenv("ALLOWED_WHATSAPP_NUMBER", "")
 
 async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id: int = None):
-    # Standardize the phone number with a + if it doesn't have one
-    phone_number = f"+{from_number.replace('@c.us', '').replace('@lid', '')}" if not from_number.startswith('+') else from_number.replace('@c.us', '').replace('@lid', '')
+    try:
+        # Standardize the phone number with a + if it doesn't have one
+        phone_number = f"+{from_number.replace('@c.us', '').replace('@lid', '')}" if not from_number.startswith('+') else from_number.replace('@c.us', '').replace('@lid', '')
 
     if ALLOWED_WHATSAPP_NUMBER and not phone_number.endswith(ALLOWED_WHATSAPP_NUMBER.replace('+', '')):
         print(f"[WhatsApp] Ignoring message from {phone_number} because it is not the ALLOWED_WHATSAPP_NUMBER.")
@@ -33,7 +34,7 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
     db = SessionLocal()
     try:
         if bot_user_id is not None:
-            user_id = bot_user_id
+            user_id = int(bot_user_id)
         else:
             user = get_or_create_user_by_phone(db, phone_number)
             user_id = user.id
@@ -127,6 +128,10 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
                         print(f"[WhatsApp Meta] Error sending message: {e}")
             else:
                 print("[WhatsApp Node] No bot_user_id provided, cannot send reply.")
+    except Exception as e:
+        import traceback
+        print(f"[WhatsApp] Unhandled Exception in process_meta_whatsapp_message: {e}")
+        traceback.print_exc()
     finally:
         db.close()
 
