@@ -26,108 +26,108 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
         # Standardize the phone number with a + if it doesn't have one
         phone_number = f"+{from_number.replace('@c.us', '').replace('@lid', '')}" if not from_number.startswith('+') else from_number.replace('@c.us', '').replace('@lid', '')
 
-    if ALLOWED_WHATSAPP_NUMBER and not phone_number.endswith(ALLOWED_WHATSAPP_NUMBER.replace('+', '')):
-        print(f"[WhatsApp] Ignoring message from {phone_number} because it is not the ALLOWED_WHATSAPP_NUMBER.")
-        return
+        if ALLOWED_WHATSAPP_NUMBER and not phone_number.endswith(ALLOWED_WHATSAPP_NUMBER.replace('+', '')):
+            print(f"[WhatsApp] Ignoring message from {phone_number} because it is not the ALLOWED_WHATSAPP_NUMBER.")
+            return
 
-    from app.database.database import SessionLocal
-    db = SessionLocal()
-    try:
-        if bot_user_id is not None:
-            user_id = int(bot_user_id)
-        else:
-            user = get_or_create_user_by_phone(db, phone_number)
-            user_id = user.id
-
-        # 1. Find or create conversation
-        conversation = db.query(Conversation).filter(
-            Conversation.user_id == user_id,
-            Conversation.platform == f"whatsapp_{phone_number}"
-        ).first()
-        
-        if not conversation:
-            conversation = Conversation(user_id=user_id, platform=f"whatsapp_{phone_number}")
-            db.add(conversation)
-            db.commit()
-            db.refresh(conversation)
-
-        # 2. Save user message
-        user_msg = Message(
-            conversation_id=conversation.id,
-            sender="user",
-            message=body
-        )
-        db.add(user_msg)
-        db.commit()
-        db.refresh(user_msg)
-
-        # 3. Broadcast incoming message to the UI
-        import asyncio
-        await manager.broadcast_to_all(
-            {
-                "id": user_msg.id,
-                "conversation_id": user_msg.conversation_id,
-                "sender": user_msg.sender,
-                "message": user_msg.message,
-                "created_at": user_msg.created_at.isoformat()
-            }
-        )
-
-        # 4. Ask LLM
+        from app.database.database import SessionLocal
+        db = SessionLocal()
         try:
-            answer = await asyncio.to_thread(ask_llm, body)
-        except Exception as e:
-            answer = f"Sorry, an error occurred: {str(e)}"
-
-        # 5. Save bot message
-        bot_msg = Message(
-            conversation_id=conversation.id,
-            sender="bot",
-            message=answer
-        )
-        db.add(bot_msg)
-        db.commit()
-        db.refresh(bot_msg)
-
-        # 6. Broadcast outgoing message to the UI
-        await manager.broadcast_to_all(
-            {
-                "id": bot_msg.id,
-                "conversation_id": bot_msg.conversation_id,
-                "sender": bot_msg.sender,
-                "message": bot_msg.message,
-                "created_at": bot_msg.created_at.isoformat()
-            }
-        )
-
-        # 7. Send back via Node.js Microservice
-        if bot_user_id:
-            success = await send_whatsapp_message(bot_user_id, from_number, answer)
-            if not success:
-                print("[WhatsApp Node] Error sending message via Node service.")
-        else:
-            # Fallback to Meta Graph API if it was a Meta webhook
-            if META_WHATSAPP_TOKEN and META_PHONE_NUMBER_ID:
-                url = f"https://graph.facebook.com/v19.0/{META_PHONE_NUMBER_ID}/messages"
-                headers = {
-                    "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": from_number,
-                    "type": "text",
-                    "text": {"preview_url": False, "body": answer}
-                }
-                async with httpx.AsyncClient() as client:
-                    try:
-                        response = await client.post(url, headers=headers, json=payload)
-                        response.raise_for_status()
-                    except Exception as e:
-                        print(f"[WhatsApp Meta] Error sending message: {e}")
+            if bot_user_id is not None:
+                user_id = int(bot_user_id)
             else:
-                print("[WhatsApp Node] No bot_user_id provided, cannot send reply.")
+                user = get_or_create_user_by_phone(db, phone_number)
+                user_id = user.id
+
+            # 1. Find or create conversation
+            conversation = db.query(Conversation).filter(
+                Conversation.user_id == user_id,
+                Conversation.platform == f"whatsapp_{phone_number}"
+            ).first()
+            
+            if not conversation:
+                conversation = Conversation(user_id=user_id, platform=f"whatsapp_{phone_number}")
+                db.add(conversation)
+                db.commit()
+                db.refresh(conversation)
+
+            # 2. Save user message
+            user_msg = Message(
+                conversation_id=conversation.id,
+                sender="user",
+                message=body
+            )
+            db.add(user_msg)
+            db.commit()
+            db.refresh(user_msg)
+
+            # 3. Broadcast incoming message to the UI
+            import asyncio
+            await manager.broadcast_to_all(
+                {
+                    "id": user_msg.id,
+                    "conversation_id": user_msg.conversation_id,
+                    "sender": user_msg.sender,
+                    "message": user_msg.message,
+                    "created_at": user_msg.created_at.isoformat()
+                }
+            )
+
+            # 4. Ask LLM
+            try:
+                answer = await asyncio.to_thread(ask_llm, body)
+            except Exception as e:
+                answer = f"Sorry, an error occurred: {str(e)}"
+
+            # 5. Save bot message
+            bot_msg = Message(
+                conversation_id=conversation.id,
+                sender="bot",
+                message=answer
+            )
+            db.add(bot_msg)
+            db.commit()
+            db.refresh(bot_msg)
+
+            # 6. Broadcast outgoing message to the UI
+            await manager.broadcast_to_all(
+                {
+                    "id": bot_msg.id,
+                    "conversation_id": bot_msg.conversation_id,
+                    "sender": bot_msg.sender,
+                    "message": bot_msg.message,
+                    "created_at": bot_msg.created_at.isoformat()
+                }
+            )
+
+            # 7. Send back via Node.js Microservice
+            if bot_user_id:
+                success = await send_whatsapp_message(bot_user_id, from_number, answer)
+                if not success:
+                    print("[WhatsApp Node] Error sending message via Node service.")
+            else:
+                # Fallback to Meta Graph API if it was a Meta webhook
+                if META_WHATSAPP_TOKEN and META_PHONE_NUMBER_ID:
+                    url = f"https://graph.facebook.com/v19.0/{META_PHONE_NUMBER_ID}/messages"
+                    headers = {
+                        "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "messaging_product": "whatsapp",
+                        "recipient_type": "individual",
+                        "to": from_number,
+                        "type": "text",
+                        "text": {"preview_url": False, "body": answer}
+                    }
+                    async with httpx.AsyncClient() as client:
+                        try:
+                            response = await client.post(url, headers=headers, json=payload)
+                            response.raise_for_status()
+                        except Exception as e:
+                            print(f"[WhatsApp Meta] Error sending message: {e}")
+                else:
+                    print("[WhatsApp Node] No bot_user_id provided, cannot send reply.")
     except Exception as e:
         import traceback
         print(f"[WhatsApp] Unhandled Exception in process_meta_whatsapp_message: {e}")
