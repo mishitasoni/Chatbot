@@ -127,20 +127,27 @@ async function initWhatsAppSession(userId) {
 
                 // Determine our own Number safely
                 let isMessageYourself = false;
+                let myNumber = "";
+                let remoteNumber = "";
                 if (sock.user && sock.user.id) {
-                    const myNumber = sock.user.id.split(':')[0];
-                    const remoteNumber = remoteJid.split('@')[0];
+                    myNumber = sock.user.id.split(':')[0];
+                    remoteNumber = remoteJid.split('@')[0];
                     isMessageYourself = (myNumber === remoteNumber);
-                    // console.log(`[WhatsApp Service] Message from ${remoteNumber} to ${myNumber}. isYourself: ${isMessageYourself}`);
                 }
 
-                // Only allow messages sent in the "Message yourself" chat (personal chat)
-                if (!isMessageYourself) {
-                    continue;
-                }
+                // Log every message to see what we are getting!
+                console.log(`[DEBUG] Received msg. fromMe: ${msg.key.fromMe}, remoteJid: ${remoteJid}, isYourself: ${isMessageYourself}`);
 
                 // Prevent infinite loop by ignoring messages the bot just sent
                 if (msg.key.id && sessionObj.botSentMessageIds.has(msg.key.id)) continue;
+                
+                // Allow ONLY messages where either:
+                // 1. It is sent to yourself (personal chat)
+                // 2. OR it is an explicit direct message to the bot's number from someone else
+                // But for now, let's process personal chats.
+                if (!isMessageYourself) {
+                    continue;
+                }
                 
                 let msgContent = msg.message;
                 if (msgContent?.ephemeralMessage?.message) {
@@ -160,7 +167,10 @@ async function initWhatsAppSession(userId) {
                            "";
                            
                 if (!body) {
-                    console.log(`[WhatsApp Service] Empty body detected. Message structure:`, JSON.stringify(msg.message));
+                    // Ignore protocol messages in logs to avoid spam
+                    if (!msgContent?.protocolMessage) {
+                        console.log(`[WhatsApp Service] Empty body detected. Message structure:`, JSON.stringify(msg.message));
+                    }
                 } else {
                     console.log(`[WhatsApp Service] Processing message from ${remoteJid}: ${body}`);
                 }
