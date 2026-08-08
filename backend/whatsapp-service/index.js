@@ -181,6 +181,7 @@ async function initWhatsAppSession(userId) {
                 if (fromMe && isSelfChat && body && sessionObj.recentBotResponses.has(body)) {
                     continue;
                 }
+                if (!body) {
                     // Ignore protocol messages in logs to avoid spam
                     if (!msgContent?.protocolMessage) {
                         console.log(`[WhatsApp Service] Empty body detected. Message structure:`, JSON.stringify(msg.message));
