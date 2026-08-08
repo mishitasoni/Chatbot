@@ -67,12 +67,7 @@ async def send_chat_message(msg_in: MessageCreate, x_user_id: int = Header(...),
     # Generate bot reply
     try:
         import asyncio
-        reply_text = await asyncio.wait_for(
-            asyncio.to_thread(ask_llm, msg_in.message),
-            timeout=15.0
-        )
-    except asyncio.TimeoutError:
-        reply_text = "Error: LLM response timed out after 15 seconds. The API might be down or your key is restricted."
+        reply_text = await asyncio.to_thread(ask_llm, msg_in.message)
     except Exception as e:
         reply_text = f"Error: {str(e)}"
         
