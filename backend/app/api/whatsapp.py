@@ -73,6 +73,7 @@ async def process_whatsapp_message(body: str, from_number: str, bot_user_id: int
         
         if not is_safe_self_chat:
             # Fallback 1: Check against the user's registered phone number in the DB
+            from app.models.user import User
             user = db.query(User).filter(User.id == user_id).first()
             if user and user.phone:
                 db_phone = user.phone.replace('+', '')
