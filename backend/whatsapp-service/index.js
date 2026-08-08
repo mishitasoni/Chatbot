@@ -11,6 +11,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+function isSelfChatMessage(msg, sock) {
+    if (!sock || !sock.user || !sock.user.id) return false;
+    if (!msg || !msg.key || !msg.key.remoteJid) return false;
+    
+    const myNumber = sock.user.id.split(':')[0].split('@')[0];
+    const remoteNumber = msg.key.remoteJid.split('@')[0];
+    
+    return myNumber === remoteNumber;
+}
+
 app.get('/', (req, res) => {
     res.send('WhatsApp Microservice is running successfully!');
 });
@@ -124,28 +134,27 @@ async function initWhatsAppSession(userId) {
             for (const msg of m.messages) {
                 const remoteJid = msg.key.remoteJid;
                 if (!remoteJid) continue;
+                if (remoteJid.includes('@g.us')) continue; // Skip group chats
 
-                // Determine our own Number safely
-                let isMessageYourself = false;
-                let myNumber = "";
-                let remoteNumber = "";
-                if (sock.user && sock.user.id) {
-                    myNumber = sock.user.id.split(':')[0];
-                    remoteNumber = remoteJid.split('@')[0];
-                    isMessageYourself = (myNumber === remoteNumber);
+                const isSelfChat = isSelfChatMessage(msg, sock);
+                const fromMe = msg.key.fromMe === true;
+                const isBotOutbound = msg.key.id && sessionObj.botSentMessageIds.has(msg.key.id);
+
+                console.log(`[WhatsApp] Message received`);
+                console.log(`fromMe: ${fromMe}`);
+                console.log(`remoteJid: ${remoteJid}`);
+                console.log(`isSelfChat: ${isSelfChat}`);
+
+                // Prevent infinite loop by ignoring messages the bot just sent (by ID)
+                if (isBotOutbound) {
+                    console.log(`[WhatsApp] Bot outbound message detected (by ID)`);
+                    console.log(`[WhatsApp] Ignoring to prevent loop`);
+                    continue;
                 }
 
-                // Log every message to see what we are getting!
-                console.log(`[DEBUG] Received msg. fromMe: ${msg.key.fromMe}, remoteJid: ${remoteJid}, isYourself: ${isMessageYourself}`);
-
-                // Prevent infinite loop by ignoring messages the bot just sent
-                if (msg.key.id && sessionObj.botSentMessageIds.has(msg.key.id)) continue;
-                
-                // Allow ONLY messages where either:
-                // 1. It is sent to yourself (personal chat)
-                // 2. OR it is an explicit direct message to the bot's number from someone else
-                // But for now, let's process personal chats.
-                if (!isMessageYourself) {
+                // Ignore outbound messages sent to other users
+                if (fromMe && !isSelfChat) {
+                    console.log(`[WhatsApp] Outbound message to another user. Ignoring.`);
                     continue;
                 }
                 
@@ -166,7 +175,15 @@ async function initWhatsAppSession(userId) {
                            msgContent?.videoMessage?.caption || 
                            "";
                            
-                if (!body) {
+                if (fromMe && isSelfChat) {
+                    if (body && sessionObj.recentBotResponses.has(body)) {
+                        console.log(`[WhatsApp] Bot outbound message detected (by text match)`);
+                        console.log(`[WhatsApp] Ignoring to prevent loop`);
+                        continue;
+                    }
+                    console.log(`[WhatsApp] Self-message detected`);
+                    console.log(`[WhatsApp] Processing self-message`);
+                } else if (!body) {
                     // Ignore protocol messages in logs to avoid spam
                     if (!msgContent?.protocolMessage) {
                         console.log(`[WhatsApp Service] Empty body detected. Message structure:`, JSON.stringify(msg.message));

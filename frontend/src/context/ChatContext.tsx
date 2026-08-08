@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useRef, useEffect } from 'react';
 import { ChannelType, Conversation, Message } from '../types';
+import { useAuth } from './AuthContext';
 
 interface ChatContextType {
   selectedChannel: ChannelType;
@@ -32,10 +33,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isThinking, setIsThinking] = useState(false);
 
   const currentConvRef = useRef(currentConversation);
+  const { user } = useAuth();
   
   useEffect(() => {
     currentConvRef.current = currentConversation;
   }, [currentConversation]);
+
+  useEffect(() => {
+    if (!user) {
+      setConversations([]);
+      setMessages([]);
+      setCurrentConversation(null);
+    }
+  }, [user]);
 
   const addMessage = useCallback((message: Message) => {
     setMessages((prev) => {

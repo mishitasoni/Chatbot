@@ -14,15 +14,10 @@ router = APIRouter()
 
 @router.get("/conversations", response_model=List[ConversationResponse])
 def get_conversations(platform: str, x_user_id: int = Header(...), db: Session = Depends(get_db)):
-    if platform in ["whatsapp", "telegram"]:
-        conversations = db.query(Conversation).filter(
-            Conversation.platform.like(f"{platform}%")
-        ).order_by(Conversation.id.desc()).all()
-    else:
-        conversations = db.query(Conversation).filter(
-            Conversation.user_id == x_user_id,
-            Conversation.platform.like(f"{platform}%")
-        ).order_by(Conversation.id.desc()).all()
+    conversations = db.query(Conversation).filter(
+        Conversation.user_id == x_user_id,
+        Conversation.platform.like(f"{platform}%")
+    ).order_by(Conversation.id.desc()).all()
     return conversations
 
 @router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])

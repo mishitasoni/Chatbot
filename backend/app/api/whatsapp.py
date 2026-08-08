@@ -62,7 +62,8 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
 
         # 3. Broadcast incoming message to the UI
         import asyncio
-        await manager.broadcast_to_all(
+        await manager.broadcast_to_user(
+            str(user_id),
             {
                 "id": user_msg.id,
                 "conversation_id": user_msg.conversation_id,
@@ -89,7 +90,8 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
         db.refresh(bot_msg)
 
         # 6. Broadcast outgoing message to the UI
-        await manager.broadcast_to_all(
+        await manager.broadcast_to_user(
+            str(user_id),
             {
                 "id": bot_msg.id,
                 "conversation_id": bot_msg.conversation_id,
