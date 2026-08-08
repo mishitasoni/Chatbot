@@ -23,7 +23,19 @@ async def send_whatsapp_message(user_id: int, to: str, message: str) -> bool:
     """
     Calls the Node.js microservice to send a WhatsApp message.
     """
-    # The new whatsapp_service.js responds directly, so this may not be needed 
-    # for regular LLM responses, but we keep a dummy fallback or the new endpoint if we had one.
-    # The new script doesn't have a /send route, so we just return True for now.
-    return True
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{NODE_SERVICE_URL}/api/wa/send",
+                json={
+                    "userId": str(user_id),
+                    "to": to,
+                    "message": message
+                },
+                timeout=15.0
+            )
+            response.raise_for_status()
+            return True
+    except Exception as e:
+        print(f"[whatsapp_manager] Error sending message via Node: {e}")
+        return False

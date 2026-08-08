@@ -152,8 +152,6 @@ async function initWhatsAppSession(userId, forceRestart = false) {
         const sessionId = `whatsapp_${cleanPhone}`;
 
         try {
-            let solution = '';
-            
             const textMessage = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || '';
 
             if (sessionObj.recentBotResponses.has(textMessage)) continue;
@@ -176,6 +174,9 @@ async function initWhatsAppSession(userId, forceRestart = false) {
                 };
             }
 
+            let base64Media = null;
+            let mimeType = null;
+            
             if (imageMessage) {
                 try {
                     const buffer = await downloadMediaMessage(
@@ -187,71 +188,31 @@ async function initWhatsAppSession(userId, forceRestart = false) {
                             reuploadRequest: sock.updateMediaMessage
                         }
                     );
-
-                    const filename = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-                    const filePath = path.join(UPLOADS_DIR, filename);
-                    fs.writeFileSync(filePath, buffer);
-
-                    const prompt = textMessage || 'Analyze and solve the problem shown in this image.';
-                    
-                    const fileBuffer = fs.readFileSync(filePath);
-                    const blob = new Blob([fileBuffer], { type: 'image/jpeg' });
-                    const formData = new FormData(); 
-                    formData.append('image', blob, filename);
-                    formData.append('message', prompt);
-                    formData.append('session_id', sessionId);
-                    formData.append('channel', 'whatsapp');
-                    formData.append('user_id', userIdStr);
-
-                    const res = await fetch(`${FASTAPI_URL}/api/chat/image`, {
-                      method: 'POST',
-                      body: formData
-                    });
-
-                    if (res.ok) {
-                      const data = await res.json();
-                      solution = data.solution;
-                    } else {
-                      console.error(`[WhatsApp-Web Service] FastAPI Image Error: ${res.status} ${res.statusText}`);
-                      solution = "⚠️ *Error:* My brain (FastAPI) is having trouble processing this image right now.";
-                    }
+                    base64Media = buffer.toString('base64');
+                    mimeType = imageMessage.mimetype || 'image/jpeg';
                 } catch (downloadErr) {
                     console.error("[WhatsApp-Web Service] Media download failed:", downloadErr.message);
-                    solution = "⚠️ *Error:* I received your message, but WhatsApp failed to extract the image data. Please upload it via **Telegram** / **Web App**.";
                 }
-            } else if (textMessage) {
-                const res = await fetch(`${FASTAPI_URL}/ask`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    question: textMessage,
-                    channel: 'whatsapp',
-                    session_id: sessionId,
-                    user_id: parseInt(userIdStr)
-                  })
+            }
+            
+            try {
+                await fetch(`${FASTAPI_URL}/whatsapp/webhook/node`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: userIdStr,
+                        from: remoteJid.replace('@s.whatsapp.net', '@c.us'),
+                        body: textMessage,
+                        mediaBase64: base64Media,
+                        mimeType: mimeType,
+                        fromMe: msg.key.fromMe,
+                        isSelfChat: isSelfChat
+                    })
                 });
-
-                if (res.ok) {
-                  const data = await res.json();
-                  solution = data.solution;
-                } else {
-                  console.error(`[WhatsApp-Web Service] FastAPI Text Error: ${res.status} ${res.statusText}`);
-                  try {
-                    console.error(await res.text());
-                  } catch(e) {}
-                  solution = "⚠️ *Error:* My brain (FastAPI) is having trouble right now. Please check the backend console.";
-                }
+                console.log(`[WhatsApp-Web Service] Forwarded message to FastAPI Webhook`);
+            } catch (err) {
+                console.error(`[WhatsApp-Web Service] Error forwarding webhook:`, err.message);
             }
-
-            if (solution) {
-              sessionObj.recentBotResponses.add(solution);
-              const sentMsg = await sock.sendMessage(remoteJid, { text: solution });
-              if (sentMsg && sentMsg.key && sentMsg.key.id) {
-                sessionObj.botSentMessageIds.add(sentMsg.key.id);
-              }
-              console.log(`[WhatsApp-Web Service] Sent AI response to ${remoteJid}`);
-            }
-
         } catch (err) {
             console.error(`[WhatsApp-Web Message Error]:`, err);
         }
@@ -264,6 +225,38 @@ async function initWhatsAppSession(userId, forceRestart = false) {
 }
 
 // API Routes
+app.post('/api/wa/send', async (req, res) => {
+    const { userId, to, message } = req.body;
+    const userIdStr = String(userId);
+    const sessionObj = activeSessions.get(userIdStr);
+
+    if (!sessionObj || !sessionObj.connected || !sessionObj.client) {
+        return res.status(400).json({ error: 'Client not connected' });
+    }
+
+    try {
+        let jid = to;
+        if (jid.includes('@c.us')) {
+            jid = jid.replace('@c.us', '@s.whatsapp.net');
+        } else if (!jid.includes('@')) {
+            jid = `${jid.replace('+', '')}@s.whatsapp.net`;
+        }
+        
+        sessionObj.recentBotResponses.add(message);
+        
+        const sentMsg = await sessionObj.client.sendMessage(jid, { text: message });
+        
+        if (sentMsg && sentMsg.key && sentMsg.key.id) {
+            sessionObj.botSentMessageIds.add(sentMsg.key.id);
+        }
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error(`[WhatsApp Service] Error sending message:`, error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/api/wa/qr', async (req, res) => {
   const userId = req.query.user_id || 1;
   const sessionObj = await initWhatsAppSession(userId, req.query.force === 'true');
