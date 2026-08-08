@@ -11,8 +11,8 @@ WORKDIR /app
 COPY frontend/package*.json ./frontend/
 RUN cd frontend && npm install
 
-COPY backend/whatsapp-service/package*.json ./backend/whatsapp-service/
-RUN cd backend/whatsapp-service && npm install
+COPY backend/package*.json ./backend/
+RUN cd backend && npm install
 
 COPY backend/requirements.txt ./backend/
 RUN cd backend && pip install --no-cache-dir -r requirements.txt
