@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.WHATSAPP_SERVICE_PORT || 8006;
-const FASTAPI_URL = process.env.FASTAPI_URL || 'http://127.0.0.1:8005';
+const FASTAPI_URL = process.env.FASTAPI_URL || `http://127.0.0.1:${process.env.PORT || 7860}`;
 const SESSIONS_DIR = path.join(__dirname, 'sessions');
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads', 'images');
 
