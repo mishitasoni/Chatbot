@@ -2,8 +2,8 @@
 
 # Start the WhatsApp Node.js microservice in the background
 echo "Starting WhatsApp Microservice..."
-cd /app/backend/whatsapp-service
-node index.js &
+cd /app/backend
+node whatsapp_service.js &
 
 # Start the FastAPI backend in the foreground
 echo "Starting FastAPI Backend..."

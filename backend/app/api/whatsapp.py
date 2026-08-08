@@ -33,6 +33,31 @@ async def process_whatsapp_message(body: str, from_number: str, bot_user_id: int
             user = get_or_create_user_by_phone(db, phone_number)
             user_id = user.id
 
+        # Check if it's a self-chat securely using the database early
+        is_safe_self_chat = is_self_chat
+        
+        if not is_safe_self_chat:
+            # Fallback 1: Check against the user's registered phone number in the DB
+            from app.models.user import User
+            user_obj = db.query(User).filter(User.id == user_id).first()
+            if user_obj and user_obj.phone:
+                db_phone = user_obj.phone.replace('+', '')
+                req_phone = phone_number.replace('+', '')
+                if req_phone.endswith(db_phone) or db_phone.endswith(req_phone):
+                    is_safe_self_chat = True
+                    
+            # Fallback 2: Check against ALLOWED_WHATSAPP_NUMBER
+            if not is_safe_self_chat and ALLOWED_WHATSAPP_NUMBER:
+                allowed_phone = ALLOWED_WHATSAPP_NUMBER.replace('+', '')
+                req_phone = phone_number.replace('+', '')
+                if req_phone.endswith(allowed_phone) or allowed_phone.endswith(req_phone):
+                    is_safe_self_chat = True
+
+        # If it's a message to/from another user, DO NOT process it at all!
+        if not is_safe_self_chat:
+            print(f"[WhatsApp] Message to/from another user detected. Skipping processing and bot reply.")
+            return
+
         # 1. Find or create conversation
         conversation = db.query(Conversation).filter(
             Conversation.user_id == user_id,
@@ -67,31 +92,6 @@ async def process_whatsapp_message(body: str, from_number: str, bot_user_id: int
                 "created_at": user_msg.created_at.isoformat()
             }
         )
-
-        # Check if it's a self-chat securely using the database
-        is_safe_self_chat = is_self_chat
-        
-        if not is_safe_self_chat:
-            # Fallback 1: Check against the user's registered phone number in the DB
-            from app.models.user import User
-            user = db.query(User).filter(User.id == user_id).first()
-            if user and user.phone:
-                db_phone = user.phone.replace('+', '')
-                req_phone = phone_number.replace('+', '')
-                if req_phone.endswith(db_phone) or db_phone.endswith(req_phone):
-                    is_safe_self_chat = True
-                    
-            # Fallback 2: Check against ALLOWED_WHATSAPP_NUMBER
-            if not is_safe_self_chat and ALLOWED_WHATSAPP_NUMBER:
-                allowed_phone = ALLOWED_WHATSAPP_NUMBER.replace('+', '')
-                req_phone = phone_number.replace('+', '')
-                if req_phone.endswith(allowed_phone) or allowed_phone.endswith(req_phone):
-                    is_safe_self_chat = True
-
-        # If it's a message to/from another user, DO NOT generate a bot reply!
-        if not is_safe_self_chat:
-            print(f"[WhatsApp] Message to/from another user detected. Skipping bot reply.")
-            return
 
         # 4. Ask LLM
         try:

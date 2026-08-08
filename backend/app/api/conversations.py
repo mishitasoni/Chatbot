@@ -98,6 +98,14 @@ async def send_chat_message(msg_in: MessageCreate, x_user_id: int = Header(...),
         }
     )
 
+    # Mirror bot reply to WhatsApp if it's a WhatsApp conversation
+    if conversation.platform.startswith("whatsapp_"):
+        phone_number = conversation.platform.replace("whatsapp_", "")
+        from app.services.whatsapp_manager import send_whatsapp_message
+        # Run asynchronously without blocking the response
+        import asyncio
+        asyncio.create_task(send_whatsapp_message(x_user_id, phone_number, reply_text))
+
     return bot_msg
 
 @router.delete("/conversations/{conversation_id}")
