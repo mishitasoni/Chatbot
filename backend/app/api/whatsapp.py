@@ -67,10 +67,28 @@ async def process_whatsapp_message(body: str, from_number: str, bot_user_id: int
             }
         )
 
+        # Check if it's a self-chat securely using the database
+        is_safe_self_chat = is_self_chat
+        
+        if from_me and not is_safe_self_chat:
+            # Fallback 1: Check against the user's registered phone number in the DB
+            user = db.query(User).filter(User.id == user_id).first()
+            if user and user.phone:
+                db_phone = user.phone.replace('+', '')
+                req_phone = phone_number.replace('+', '')
+                if req_phone.endswith(db_phone) or db_phone.endswith(req_phone):
+                    is_safe_self_chat = True
+                    
+            # Fallback 2: Check against ALLOWED_WHATSAPP_NUMBER
+            if not is_safe_self_chat and ALLOWED_WHATSAPP_NUMBER:
+                allowed_phone = ALLOWED_WHATSAPP_NUMBER.replace('+', '')
+                req_phone = phone_number.replace('+', '')
+                if req_phone.endswith(allowed_phone) or allowed_phone.endswith(req_phone):
+                    is_safe_self_chat = True
+
         # If it's an outbound message to another user, DO NOT generate a bot reply!
-        # Only ask LLM if it's an inbound message from someone else, OR if it's a self-chat (you talking to the bot)
-        if from_me and not is_self_chat:
-            print(f"[WhatsApp] Outbound message to another user detected. Skipping bot reply.")
+        if from_me and not is_safe_self_chat:
+            print(f"[WhatsApp] Outbound message to another user detected (or self-chat detection failed). Skipping bot reply.")
             return
 
         # 4. Ask LLM
