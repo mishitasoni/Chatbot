@@ -1,7 +1,8 @@
+import os
 import httpx
 from typing import Optional
 
-NODE_SERVICE_URL = "http://127.0.0.1:3001"
+NODE_SERVICE_URL = os.getenv("NODE_SERVICE_URL", "http://127.0.0.1:3001")
 
 def get_qr_for_user(user_id: int) -> Optional[str]:
     """

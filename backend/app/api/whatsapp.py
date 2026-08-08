@@ -1,7 +1,6 @@
 import os
 import httpx
 from fastapi import APIRouter, Request, Depends, BackgroundTasks, HTTPException, Query
-from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app.services.chatbot import ask_llm
@@ -14,14 +13,9 @@ from app.services.whatsapp_manager import send_whatsapp_message
 
 router = APIRouter()
 
-# Meta credentials from environment variables
-META_WHATSAPP_TOKEN = os.getenv("META_WHATSAPP_TOKEN")
-META_PHONE_NUMBER_ID = os.getenv("META_PHONE_NUMBER_ID")
-# Provide a fallback for the verify token so you can use it immediately for setup
-META_VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN", "doubtnut_webhook_secret")
 ALLOWED_WHATSAPP_NUMBER = os.getenv("ALLOWED_WHATSAPP_NUMBER", "")
 
-async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id: int = None):
+async def process_whatsapp_message(body: str, from_number: str, bot_user_id: int = None, from_me: bool = False, is_self_chat: bool = False):
     # Standardize the phone number with a + if it doesn't have one
     phone_number = f"+{from_number.replace('@c.us', '').replace('@lid', '')}" if not from_number.startswith('+') else from_number.replace('@c.us', '').replace('@lid', '')
 
@@ -50,7 +44,7 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
             db.commit()
             db.refresh(conversation)
 
-        # 2. Save user message
+        # 2. Save user message (if fromMe is true, it means the user sent it from their phone. We still save it as sender="user" so it shows on the right side of the UI)
         user_msg = Message(
             conversation_id=conversation.id,
             sender="user",
@@ -72,6 +66,12 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
                 "created_at": user_msg.created_at.isoformat()
             }
         )
+
+        # If it's an outbound message to another user, DO NOT generate a bot reply!
+        # Only ask LLM if it's an inbound message from someone else, OR if it's a self-chat (you talking to the bot)
+        if from_me and not is_self_chat:
+            print(f"[WhatsApp] Outbound message to another user detected. Skipping bot reply.")
+            return
 
         # 4. Ask LLM
         try:
@@ -107,35 +107,13 @@ async def process_meta_whatsapp_message(body: str, from_number: str, bot_user_id
             if not success:
                 print("[WhatsApp Node] Error sending message via Node service.")
         else:
-            # Fallback to Meta Graph API if it was a Meta webhook
-            if META_WHATSAPP_TOKEN and META_PHONE_NUMBER_ID:
-                url = f"https://graph.facebook.com/v19.0/{META_PHONE_NUMBER_ID}/messages"
-                headers = {
-                    "Authorization": f"Bearer {META_WHATSAPP_TOKEN}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": from_number,
-                    "type": "text",
-                    "text": {"preview_url": False, "body": answer}
-                }
-                async with httpx.AsyncClient() as client:
-                    try:
-                        response = await client.post(url, headers=headers, json=payload)
-                        response.raise_for_status()
-                    except Exception as e:
-                        print(f"[WhatsApp Meta] Error sending message: {e}")
-            else:
-                print("[WhatsApp Node] No bot_user_id provided, cannot send reply.")
+            print("[WhatsApp Node] No bot_user_id provided, cannot send reply.")
     except Exception as e:
         import traceback
-        print(f"[WhatsApp] Unhandled Exception in process_meta_whatsapp_message: {e}")
+        print(f"[WhatsApp] Unhandled Exception in process_whatsapp_message: {e}")
         traceback.print_exc()
     finally:
         db.close()
-
 
 @router.post("/whatsapp/webhook/node")
 async def receive_node_webhook(
@@ -153,72 +131,16 @@ async def receive_node_webhook(
         body = data.get("body", "")
         media_base64 = data.get("mediaBase64")
         mime_type = data.get("mimeType", "image/jpeg")
+        from_me = data.get("fromMe", False)
+        is_self_chat = data.get("isSelfChat", False)
         
         if media_base64:
             body = f"![image](data:{mime_type};base64,{media_base64})\n\n{body}"
         
         if user_id and from_number and body:
-            # We already know the user_id this bot belongs to!
-            # But the 'from' is the phone number of the person texting the bot.
-            # We can process it the same way.
-            background_tasks.add_task(process_meta_whatsapp_message, body, from_number, user_id)
+            background_tasks.add_task(process_whatsapp_message, body, from_number, user_id, from_me, is_self_chat)
             
     except Exception as e:
         print(f"[WhatsApp Node] Error parsing webhook: {e}")
         
-    return {"status": "ok"}
-
-
-@router.get("/whatsapp/webhook")
-async def verify_webhook(
-    hub_mode: str = Query(None, alias="hub.mode"),
-    hub_verify_token: str = Query(None, alias="hub.verify_token"),
-    hub_challenge: str = Query(None, alias="hub.challenge")
-):
-    """
-    Meta requires a GET request to verify the webhook URL during setup.
-    """
-    if hub_mode == "subscribe" and hub_verify_token == META_VERIFY_TOKEN:
-        print("[WhatsApp Meta] Webhook verified successfully!")
-        return PlainTextResponse(hub_challenge)
-    raise HTTPException(status_code=403, detail="Invalid verification token")
-
-
-@router.post("/whatsapp/webhook")
-async def receive_webhook(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
-):
-    """
-    Receive incoming messages from Meta WhatsApp API.
-    """
-    try:
-        data = await request.json()
-        
-        # Meta's payload structure
-        if "entry" in data and len(data["entry"]) > 0:
-            for entry in data["entry"]:
-                if "changes" in entry and len(entry["changes"]) > 0:
-                    change = entry["changes"][0]
-                    if change.get("field") == "messages":
-                        value = change.get("value", {})
-                        
-                        # Check if this is an actual message (and not a status update like "read" or "delivered")
-                        if "messages" in value and len(value["messages"]) > 0:
-                            message_data = value["messages"][0]
-                            
-                            from_number = message_data.get("from")
-                            
-                            # Handle text messages
-                            if message_data.get("type") == "text":
-                                body = message_data.get("text", {}).get("body", "")
-                                
-                                if from_number and body:
-                                    background_tasks.add_task(process_meta_whatsapp_message, body, from_number)
-                                    
-    except Exception as e:
-        print(f"[WhatsApp Meta] Error parsing webhook: {e}")
-        
-    # Always return 200 OK so Meta knows we received the webhook successfully
     return {"status": "ok"}

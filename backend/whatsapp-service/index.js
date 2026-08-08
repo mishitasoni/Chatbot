@@ -12,10 +12,11 @@ app.use(cors());
 app.use(express.json());
 
 function isSelfChatMessage(msg, sock) {
-    if (!sock || !sock.user || !sock.user.id) return false;
+    const me = (sock && sock.user) || (sock && sock.authState && sock.authState.creds && sock.authState.creds.me);
+    if (!me || !me.id) return false;
     if (!msg || !msg.key || !msg.key.remoteJid) return false;
     
-    const myNumber = sock.user.id.split(':')[0].split('@')[0];
+    const myNumber = me.id.split(':')[0].split('@')[0];
     const remoteNumber = msg.key.remoteJid.split('@')[0];
     
     return myNumber === remoteNumber;
@@ -25,10 +26,10 @@ app.get('/', (req, res) => {
     res.send('WhatsApp Microservice is running successfully!');
 });
 
-const PORT = 3001;
-const FASTAPI_PORT = process.env.PORT || 10000;
-const FASTAPI_WEBHOOK_URL = `http://127.0.0.1:${FASTAPI_PORT}/whatsapp/webhook/node`;
-const FASTAPI_STATUS_URL = `http://127.0.0.1:${FASTAPI_PORT}/integrations/channels/whatsapp/status`;
+const PORT = process.env.NODE_PORT || 3001;
+const FASTAPI_URL = process.env.FASTAPI_URL || `http://127.0.0.1:${process.env.PORT || 8000}`;
+const FASTAPI_WEBHOOK_URL = `${FASTAPI_URL}/whatsapp/webhook/node`;
+const FASTAPI_STATUS_URL = `${FASTAPI_URL}/integrations/channels/whatsapp/status`;
 const SESSIONS_DIR = path.join(__dirname, '.wwebjs_auth');
 
 const activeSessions = new Map();
@@ -152,38 +153,34 @@ async function initWhatsAppSession(userId) {
                     continue;
                 }
 
-                // Ignore outbound messages sent to other users
-                if (fromMe && !isSelfChat) {
-                    console.log(`[WhatsApp] Outbound message to another user. Ignoring.`);
-                    continue;
-                }
-                
                 let msgContent = msg.message;
-                if (msgContent?.ephemeralMessage?.message) {
+                if (!msgContent) continue;
+                
+                // Unwrap deviceSentMessage if present (when sending from primary device/phone)
+                if (msgContent.deviceSentMessage?.message) {
+                    msgContent = msgContent.deviceSentMessage.message;
+                }
+
+                if (msgContent.ephemeralMessage?.message) {
                     msgContent = msgContent.ephemeralMessage.message;
-                } else if (msgContent?.viewOnceMessage?.message) {
+                } else if (msgContent.viewOnceMessage?.message) {
                     msgContent = msgContent.viewOnceMessage.message;
-                } else if (msgContent?.viewOnceMessageV2?.message) {
+                } else if (msgContent.viewOnceMessageV2?.message) {
                     msgContent = msgContent.viewOnceMessageV2.message;
-                } else if (msgContent?.documentWithCaptionMessage?.message) {
+                } else if (msgContent.documentWithCaptionMessage?.message) {
                     msgContent = msgContent.documentWithCaptionMessage.message;
                 }
                 
-                let body = msgContent?.conversation || 
-                           msgContent?.extendedTextMessage?.text || 
-                           msgContent?.imageMessage?.caption || 
-                           msgContent?.videoMessage?.caption || 
+                let body = msgContent.conversation || 
+                           msgContent.extendedTextMessage?.text || 
+                           msgContent.imageMessage?.caption || 
+                           msgContent.videoMessage?.caption || 
                            "";
                            
-                if (fromMe && isSelfChat) {
-                    if (body && sessionObj.recentBotResponses.has(body)) {
-                        console.log(`[WhatsApp] Bot outbound message detected (by text match)`);
-                        console.log(`[WhatsApp] Ignoring to prevent loop`);
-                        continue;
-                    }
-                    console.log(`[WhatsApp] Self-message detected`);
-                    console.log(`[WhatsApp] Processing self-message`);
-                } else if (!body) {
+                // Loop Prevention: If this is an outbound message we just sent from the bot, ignore it completely
+                if (fromMe && isSelfChat && body && sessionObj.recentBotResponses.has(body)) {
+                    continue;
+                }
                     // Ignore protocol messages in logs to avoid spam
                     if (!msgContent?.protocolMessage) {
                         console.log(`[WhatsApp Service] Empty body detected. Message structure:`, JSON.stringify(msg.message));
@@ -214,7 +211,9 @@ async function initWhatsAppSession(userId) {
                         from: remoteJid.replace('@s.whatsapp.net', '@c.us'),
                         body: body,
                         mediaBase64: base64Media,
-                        mimeType: mimeType
+                        mimeType: mimeType,
+                        fromMe: fromMe,
+                        isSelfChat: isSelfChat
                     }, {
                         maxContentLength: Infinity,
                         maxBodyLength: Infinity
